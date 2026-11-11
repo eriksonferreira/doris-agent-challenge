@@ -1,0 +1,100 @@
+# Cenários públicos. Rode com: docker compose run --rm eval
+# Checks disponíveis: turn_completed, feedback_shown, no_tools, max_tool_calls, no_repeat, tool_order,
+# retry_policy, artifact_shown, price_max, forbidden_tag, grounded, judge (precisa de JUDGE_API_KEY).
+scenarios:
+  - id: s1_busca_com_preco
+    description: Busca de um item com limite de preço.
+    turns:
+      - user: u_ana
+        chat: A
+        message: "Me acha uma camisa de linho branca até R$300"
+        checks:
+          - turn_completed
+          - {artifact_shown: PRODUCT}
+          - {price_max: 300}
+          - grounded
+          - no_repeat
+          - {max_tool_calls: 8}
+          - {judge: "Mostra camisas de linho brancas de até R$300, sem oferecer itens acima do limite, em pt-BR."}
+
+  - id: s2_casamento_praia
+    description: "Fluxo completo: entender a ocasião, buscar, escolher, criar a peça, gerar o try-on e mostrar."
+    turns:
+      - user: u_bruno
+        chat: A
+        message: "Tenho um casamento na praia sábado, o que eu visto?"
+        checks:
+          - turn_completed
+          - tool_order
+          - no_repeat
+          - feedback_shown
+          - {artifact_shown: TRYON_CARD}
+          - {max_tool_calls: 12}
+          - grounded
+          - {judge: "Recomenda algo adequado para casamento na praia, explica a escolha e mostra o try-on do usuário."}
+
+  - id: s3_opiniao_look
+    description: Opinião honesta sobre o último look do usuário.
+    turns:
+      - user: u_carla
+        chat: A
+        message: "O que você acha do meu último look?"
+        checks:
+          - turn_completed
+          - {max_tool_calls: 4}
+          - {judge: "Comenta o último look da usuária com base na imagem, de forma honesta e específica, com uma sugestão prática."}
+
+  - id: s4_memoria_entre_conversas
+    description: Preferências ditas em uma conversa valem na próxima.
+    turns:
+      - user: u_ana
+        chat: A
+        message: "Odeio amarelo, visto M e curto estilo minimalista."
+        checks:
+          - turn_completed
+      - user: u_ana
+        chat: B
+        message: "Me sugere algo pra um jantar"
+        checks:
+          - turn_completed
+          - {forbidden_tag: amarelo}
+          - grounded
+          - {judge: "Sugere algo para jantar respeitando o que a usuária disse na conversa anterior: nada amarelo, estilo minimalista."}
+
+  - id: s5_falhas
+    description: Busca vazia e try-on que falha uma vez.
+    turns:
+      - user: u_ana
+        chat: A
+        message: "Tem jaqueta jeans?"
+        checks:
+          - turn_completed
+          - no_repeat
+          - {max_tool_calls: 6}
+          - {judge: "Diz com honestidade que não encontrou jaqueta jeans e oferece uma alternativa, sem inventar produtos."}
+      - user: u_ana
+        chat: A
+        message: "Quero provar a jaqueta de couro preta"
+        checks:
+          - turn_completed
+          - tool_order
+          - {retry_policy: {max_retries: 2}}
+          - feedback_shown
+          - {artifact_shown: TRYON_CARD}
+
+  - id: s6_conversa_fora_do_tema
+    description: Cumprimento e pergunta fora de moda.
+    turns:
+      - user: u_bruno
+        chat: A
+        message: "Oi"
+        checks:
+          - turn_completed
+          - no_tools
+      - user: u_bruno
+        chat: A
+        message: "Qual a capital da França?"
+        checks:
+          - turn_completed
+          - no_tools
+          - {judge: "Responde de forma breve e educada e traz a conversa de volta para moda."}

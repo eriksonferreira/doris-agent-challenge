@@ -52,7 +52,7 @@ def test_feedback_shown_before_tryon_result():
     evs = [{"type": "feedback", "id": "a", "text": "Gerando…", "state": "running"},
            {"type": "artifact", "artifact": {"kind": "TRYON_CARD"}}, {"type": "done"}]
     assert check("feedback_shown", turn(calls=[TRYON_G1], events=evs)) is True
-    assert check("feedback_shown", turn(calls=[SEARCH_P01], events=[{"type": "done"}])) is True  # no slow tool
+    assert check("feedback_shown", turn(calls=[SEARCH_P01], events=[{"type": "done"}])) is None  # not applicable
 
 
 def test_feedback_missing_fails():
@@ -169,3 +169,8 @@ def test_judge_low_score_and_garbage():
 
     assert run_check({"judge": "x"}, turn(), judge=make_judge("k", "m", reply('{"score": 2, "reason": "ruim"}'))).passed is False
     assert run_check({"judge": "x"}, turn(), judge=make_judge("k", "m", reply("sem json"))).passed is False
+
+
+def test_vacuous_checks_are_skipped():
+    assert check("tool_order", turn(calls=[SEARCH_P01])) is None
+    assert check({"retry_policy": {"max_retries": 2}}, turn(calls=[SEARCH_P01, TRYON_G1])) is None

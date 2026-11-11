@@ -43,12 +43,71 @@ def make_fake_agent(behavior) -> FastAPI:
     return agent
 
 
+import asyncio
+
+
+class StreamingASGITransport(httpx.AsyncBaseTransport):
+    """Like httpx.ASGITransport, but streams the response body chunk by chunk (httpx's own
+    transport buffers the whole body, which hides event ordering between agent and proxy)."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        body = await request.aread()
+        chunks: asyncio.Queue = asyncio.Queue()
+        started, disconnected, head = asyncio.Event(), asyncio.Event(), {}
+        sent_body = False
+
+        async def receive():
+            nonlocal sent_body
+            if not sent_body:
+                sent_body = True
+                return {"type": "http.request", "body": body, "more_body": False}
+            await disconnected.wait()
+            return {"type": "http.disconnect"}
+
+        async def send(message):
+            if message["type"] == "http.response.start":
+                head.update(message)
+                started.set()
+            elif message["type"] == "http.response.body":
+                if message.get("body"):
+                    await chunks.put(message["body"])
+                if not message.get("more_body"):
+                    await chunks.put(None)
+
+        url = request.url
+        scope = {"type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": request.method,
+                 "scheme": url.scheme, "path": url.path, "raw_path": url.raw_path.split(b"?")[0],
+                 "query_string": url.query, "root_path": "", "client": ("127.0.0.1", 50000),
+                 "server": (url.host, url.port or 80), "headers": [(k.lower(), v) for k, v in request.headers.raw]}
+        task = asyncio.create_task(self.app(scope, receive, send))
+        waiter = asyncio.create_task(started.wait())
+        await asyncio.wait({task, waiter}, return_when=asyncio.FIRST_COMPLETED)
+        if not started.is_set():
+            waiter.cancel()
+            task.result()  # re-raise the app's exception
+            raise RuntimeError("app finished without a response")
+
+        class Body(httpx.AsyncByteStream):
+            async def __aiter__(self):
+                while (chunk := await chunks.get()) is not None:
+                    yield chunk
+
+            async def aclose(self):
+                disconnected.set()
+                task.cancel()
+
+        return httpx.Response(head["status"], headers=head.get("headers", []), stream=Body())
+
+
 def wire(tmp_path: Path, behavior, **settings_over) -> FastAPI:
     """Proxy app whose agent is a fake agent that calls back into this same proxy."""
     from app.main import create_app
 
     agent = make_fake_agent(behavior)
-    proxy = create_app(make_settings(tmp_path, **settings_over), agent_transport=httpx.ASGITransport(agent))
+    proxy = create_app(make_settings(tmp_path, **settings_over), agent_transport=StreamingASGITransport(agent))
     agent.state.proxy = httpx.AsyncClient(transport=httpx.ASGITransport(proxy), base_url="http://proxy")
     proxy.state.fake_agent = agent
     return proxy

@@ -59,7 +59,7 @@ def turn_completed(t: TurnResult, _) -> CheckResult:
 
 def feedback_shown(t: TurnResult, _) -> CheckResult:
     if not any(c["tool"] in SLOW_TOOLS for c in t.calls):
-        return CheckResult("feedback_shown", True, "turno sem garment/try-on")
+        return CheckResult("feedback_shown", None, "não se aplica: turno sem garment/try-on")
     for ev in t.events:
         if ev["type"] == "feedback":
             return CheckResult("feedback_shown", True, "feedback antes do resultado")
@@ -108,11 +108,15 @@ def tool_order(t: TurnResult, _) -> CheckResult:
             garments |= {g["garment_id"] for g in data.get("garments", [])}
         elif c["tool"] == "looks":
             garments |= {g for lk in data.get("looks", []) for g in lk.get("garment_ids", [])}
+    if not any(c["tool"] in SLOW_TOOLS for c in t.calls):
+        return CheckResult("tool_order", None, "não se aplica: turno sem garment/try-on")
     return CheckResult("tool_order", True, "ordem ok")
 
 
 def retry_policy(t: TurnResult, arg) -> CheckResult:
     max_retries = int((arg or {}).get("max_retries", 2))
+    if all(_ok(c) for c in t.calls):
+        return CheckResult("retry_policy", None, "não se aplica: nenhuma chamada falhou")
     for i, c in enumerate(t.calls):
         err = c["response"].get("error") if not _ok(c) else None
         if not err:
