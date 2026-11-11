@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Doris — chat</title>
+<style>
+  :root { --bg: #f7f5f2; --panel: #fff; --ink: #222; --muted: #777; --line: #e4e0da; --accent: #7a4e2d;
+          --me: #efe7dd; --err: #b3261e; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); }
+  .app { max-width: 760px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; background: var(--panel);
+         border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+  header { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 17px; margin: 0 auto 0 0; }
+  header small { width: 100%; color: var(--muted); font-size: 12px; }
+  select, button, textarea { font: inherit; }
+  button { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button:disabled, textarea:disabled { opacity: .5; cursor: not-allowed; }
+  #messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .me { align-self: flex-end; background: var(--me); padding: 8px 12px; border-radius: 12px 12px 2px 12px; max-width: 85%; white-space: pre-wrap; }
+  .me img { display: block; max-width: 160px; border-radius: 8px; margin-top: 6px; }
+  .reply { align-self: flex-start; max-width: 100%; display: flex; flex-direction: column; gap: 8px; }
+  .feedback { display: flex; flex-direction: column; gap: 2px; }
+  .fb { color: var(--muted); font-size: 13px; display: flex; gap: 6px; align-items: center; }
+  .fb .icon { width: 14px; text-align: center; }
+  .fb.running .icon::before { content: ""; display: inline-block; width: 10px; height: 10px; border: 2px solid var(--muted);
+                              border-top-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; }
+  .fb.done .icon::before { content: "✓"; color: #2e7d32; }
+  .fb.error .icon::before { content: "✗"; color: var(--err); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .text { white-space: pre-wrap; }
+  .text:empty { display: none; }
+  .text a { color: var(--accent); }
+  .cards { display: flex; flex-wrap: wrap; gap: 10px; }
+  .cards:empty { display: none; }
+  .card { width: 150px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; font-size: 13px; }
+  .card img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; background: #eee; }
+  .card .body { padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; }
+  .card .name { font-weight: 600; }
+  .card .meta { color: var(--muted); }
+  .card a { color: var(--accent); }
+  .card.tryon { width: min(320px, 100%); }
+  .error { color: var(--err); font-size: 13px; }
+  form { display: flex; gap: 8px; align-items: flex-end; padding: 12px 16px; border-top: 1px solid var(--line); }
+  textarea { flex: 1; resize: none; min-height: 40px; max-height: 140px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+  #attachment { font-size: 12px; color: var(--muted); padding: 0 16px; }
+  #attachment:empty { display: none; }
+  @media (max-width: 480px) { .card { width: calc(50% - 5px); } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Doris</h1>
+    <label>Usuário <select id="user-select" aria-label="Usuário"></select></label>
+    <button id="new-chat" type="button">Nova conversa</button>
+    <small id="conversation"></small>
+  </header>
+  <main id="messages" aria-live="polite"></main>
+  <div id="attachment"></div>
+  <form id="composer">
+    <input id="file" type="file" accept="image/*" hidden>
+    <button id="attach" type="button" title="Anexar imagem" aria-label="Anexar imagem">📎</button>
+    <textarea id="input" rows="1" placeholder="Escreva sua mensagem…" aria-label="Mensagem"></textarea>
+    <button id="send" class="primary" type="submit">Enviar</button>
+  </form>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const brl = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+let conversationId = "", image = null, busy = false;
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+
+function newConversation() {
+  conversationId = crypto.randomUUID();
+  $("messages").replaceChildren();
+  $("conversation").textContent = "conversa " + conversationId;
+  clearImage();
+}
+
+function clearImage() { image = null; $("file").value = ""; $("attachment").textContent = ""; }
+
+function setBusy(v) {
+  busy = v;
+  for (const id of ["input", "send", "attach", "user-select", "new-chat"]) $(id).disabled = v;
+  if (!v) $("input").focus();
+}
+
+function scroll() { $("messages").scrollTop = $("messages").scrollHeight; }
+
+function linkify(node, text) {
+  node.replaceChildren();
+  const re = /(https?:\/\/[^\s)]+)/g;
+  let last = 0, m;
+  while ((m = re.exec(text))) {
+    node.append(text.slice(last, m.index));
+    const a = el("a", "", m[1]); a.href = m[1]; a.target = "_blank"; a.rel = "noopener";
+    node.append(a);
+    last = m.index + m[1].length;
+  }
+  node.append(text.slice(last));
+}
+
+function card(a) {
+  const c = el("div", "card" + (a.kind === "TRYON_CARD" ? " tryon" : ""));
+  const img = el("img"); img.src = a.image_url; img.alt = a.name || a.category || "try-on"; img.loading = "lazy";
+  const body = el("div", "body");
+  if (a.kind === "PRODUCT") {
+    body.append(el("span", "name", a.name), el("span", "meta", a.store),
+                el("span", "", `${a.currency_symbol || "R$"} ${brl.format(a.price)}`));
+    const link = el("a", "", "ver produto ↗"); link.href = a.url; link.target = "_blank"; link.rel = "noopener";
+    body.append(link);
+  } else if (a.kind === "GARMENT") {
+    body.append(el("span", "name", a.category || "peça"));
+  } else {
+    body.append(el("span", "meta", "Try-on"));
+  }
+  c.append(img, body);
+  return c;
+}
+
+function reply() {
+  const r = el("div", "reply");
+  const parts = { feedback: el("div", "feedback"), text: el("div", "text"), cards: el("div", "cards"), lines: {}, raw: "" };
+  r.append(parts.feedback, parts.text, parts.cards);
+  $("messages").append(r);
+  return { root: r, ...parts };
+}
+
+function handle(ev, r) {
+  if (ev.type === "text") { r.raw += ev.delta; linkify(r.text, r.raw); }
+  else if (ev.type === "feedback") {
+    let line = r.lines[ev.id];
+    if (!line) {
+      line = el("div", "fb"); line.append(el("span", "icon"), el("span", "label"));
+      r.lines[ev.id] = line; r.feedback.append(line);
+    }
+    line.className = "fb " + ev.state;
+    line.querySelector(".label").textContent = ev.text;
+  }
+  else if (ev.type === "artifact") r.cards.append(card(ev.artifact));
+  else if (ev.type === "error") r.root.append(el("div", "error", `Erro (${ev.code}): ${ev.message}`));
+  scroll();
+}
+
+async function send(message) {
+  const me = el("div", "me", message);
+  if (image) { const i = el("img"); i.src = image; i.alt = "imagem anexada"; me.append(i); }
+  $("messages").append(me);
+  const r = reply();
+  const payload = { user_id: $("user-select").value, conversation_id: conversationId, message, images: image ? [image] : [] };
+  clearImage(); setBusy(true); scroll();
+  try {
+    const res = await fetch("/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try { const j = await res.json(); msg = j.error ? `${j.error.code}: ${j.error.message}` : msg; } catch {}
+      handle({ type: "error", code: "http", message: msg }, r);
+      return;
+    }
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = "", ended = false;
+    while (!ended) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf("\n\n")) >= 0) {
+        const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
+        for (const line of chunk.split("\n")) {
+          if (!line.startsWith("data:")) continue;
+          let ev; try { ev = JSON.parse(line.slice(5)); } catch { continue; }
+          handle(ev, r);
+          if (ev.type === "done" || ev.type === "error") ended = true;
+        }
+      }
+    }
+    if (!ended) handle({ type: "error", code: "stream", message: "a conexão terminou antes do fim da resposta" }, r);
+  } catch (e) {
+    handle({ type: "error", code: "rede", message: String(e) }, r);
+  } finally {
+    setBusy(false);
+  }
+}
+
+$("composer").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = $("input").value.trim();
+  if (!text || busy) return;
+  $("input").value = "";
+  send(text);
+});
+$("input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("composer").requestSubmit(); }
+});
+$("attach").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", () => {
+  const f = $("file").files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => { image = reader.result; $("attachment").textContent = "📎 " + f.name; };
+  reader.readAsDataURL(f);
+});
+$("new-chat").addEventListener("click", newConversation);
+$("user-select").addEventListener("change", newConversation);
+
+fetch("/users").then((r) => r.json()).then((users) => {
+  for (const u of users) { const o = el("option", "", u.name); o.value = u.user_id; $("user-select").append(o); }
+  newConversation();
+});
+</script>
+</body>
+</html>
