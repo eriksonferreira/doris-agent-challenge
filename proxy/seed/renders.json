@@ -1,0 +1,44 @@
+{
+  "u_ana": {
+    "p01": "tryons/u_ana/p01.svg",
+    "p02": "tryons/u_ana/p02.svg",
+    "p03": "tryons/u_ana/p03.svg",
+    "p04": "tryons/u_ana/p04.svg",
+    "p05": "tryons/u_ana/p05.svg",
+    "p06": "tryons/u_ana/p06.svg",
+    "p07": "tryons/u_ana/p07.svg",
+    "p08": "tryons/u_ana/p08.svg",
+    "p09": "tryons/u_ana/p09.svg",
+    "p10": "tryons/u_ana/p10.svg",
+    "w_ana_1": "tryons/u_ana/w_ana_1.svg",
+    "w_ana_2": "tryons/u_ana/w_ana_2.svg"
+  },
+  "u_bruno": {
+    "p01": "tryons/u_bruno/p01.svg",
+    "p02": "tryons/u_bruno/p02.svg",
+    "p03": "tryons/u_bruno/p03.svg",
+    "p04": "tryons/u_bruno/p04.svg",
+    "p05": "tryons/u_bruno/p05.svg",
+    "p06": "tryons/u_bruno/p06.svg",
+    "p07": "tryons/u_bruno/p07.svg",
+    "p08": "tryons/u_bruno/p08.svg",
+    "p09": "tryons/u_bruno/p09.svg",
+    "p10": "tryons/u_bruno/p10.svg",
+    "w_bruno_1": "tryons/u_bruno/w_bruno_1.svg",
+    "w_bruno_2": "tryons/u_bruno/w_bruno_2.svg"
+  },
+  "u_carla": {
+    "p01": "tryons/u_carla/p01.svg",
+    "p02": "tryons/u_carla/p02.svg",
+    "p03": "tryons/u_carla/p03.svg",
+    "p04": "tryons/u_carla/p04.svg",
+    "p05": "tryons/u_carla/p05.svg",
+    "p06": "tryons/u_carla/p06.svg",
+    "p07": "tryons/u_carla/p07.svg",
+    "p08": "tryons/u_carla/p08.svg",
+    "p09": "tryons/u_carla/p09.svg",
+    "p10": "tryons/u_carla/p10.svg",
+    "w_carla_1": "tryons/u_carla/w_carla_1.svg",
+    "w_carla_2": "tryons/u_carla/w_carla_2.svg"
+  }
+}

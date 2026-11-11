@@ -1,0 +1,23 @@
+[
+  {
+    "user_id": "u_ana",
+    "name": "Ana",
+    "gender": "FEMALE",
+    "city": "São Paulo",
+    "avatar_image": "avatars/u_ana.svg"
+  },
+  {
+    "user_id": "u_bruno",
+    "name": "Bruno",
+    "gender": "MALE",
+    "city": "Rio de Janeiro",
+    "avatar_image": "avatars/u_bruno.svg"
+  },
+  {
+    "user_id": "u_carla",
+    "name": "Carla",
+    "gender": "FEMALE",
+    "city": "Belo Horizonte",
+    "avatar_image": "avatars/u_carla.svg"
+  }
+]

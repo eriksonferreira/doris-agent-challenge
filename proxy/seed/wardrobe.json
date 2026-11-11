@@ -1,0 +1,78 @@
+{
+  "u_ana": [
+    {
+      "garment_id": "w_ana_1",
+      "type": "BOTTOM",
+      "category": "jeans",
+      "ghost_image": "ghosts/w_ana_1.svg",
+      "tags": [
+        "calca",
+        "jeans",
+        "azul"
+      ],
+      "metadata": {}
+    },
+    {
+      "garment_id": "w_ana_2",
+      "type": "TOP",
+      "category": "tshirt",
+      "ghost_image": "ghosts/w_ana_2.svg",
+      "tags": [
+        "camiseta",
+        "branca"
+      ],
+      "metadata": {}
+    }
+  ],
+  "u_bruno": [
+    {
+      "garment_id": "w_bruno_1",
+      "type": "BOTTOM",
+      "category": "chino",
+      "ghost_image": "ghosts/w_bruno_1.svg",
+      "tags": [
+        "calca",
+        "chino",
+        "caqui"
+      ],
+      "metadata": {}
+    },
+    {
+      "garment_id": "w_bruno_2",
+      "type": "TOP",
+      "category": "polo",
+      "ghost_image": "ghosts/w_bruno_2.svg",
+      "tags": [
+        "polo",
+        "azul-marinho"
+      ],
+      "metadata": {}
+    }
+  ],
+  "u_carla": [
+    {
+      "garment_id": "w_carla_1",
+      "type": "DRESS",
+      "category": "dress",
+      "ghost_image": "ghosts/w_carla_1.svg",
+      "tags": [
+        "vestido",
+        "estampado",
+        "floral"
+      ],
+      "metadata": {}
+    },
+    {
+      "garment_id": "w_carla_2",
+      "type": "TOP",
+      "category": "blouse",
+      "ghost_image": "ghosts/w_carla_2.svg",
+      "tags": [
+        "blusa",
+        "seda",
+        "verde"
+      ],
+      "metadata": {}
+    }
+  ]
+}
