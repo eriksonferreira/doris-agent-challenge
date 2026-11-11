@@ -86,6 +86,7 @@ class Store:
         return dict(row) if row else None
 
     def add_tryon(self, user_id: str, record: dict) -> None:
+        self.db.execute("DELETE FROM tryons WHERE user_id = ? AND tryon_id = ?", (user_id, record["tryon_id"]))
         self.db.execute(
             "INSERT INTO tryons (user_id, tryon_id, look_id, garment_ids_json, image_url, created_at)"
             " VALUES (?, ?, ?, ?, ?, ?)",

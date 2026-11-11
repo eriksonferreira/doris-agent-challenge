@@ -85,3 +85,11 @@ def test_active_turns_not_persisted(tmp_path):
     path = str(tmp_path / "p.db")
     Store(path).begin_turn("c1", "u_ana", "oi")
     assert Store(path).active_turn("c1") is None
+
+
+def test_tryon_readd_moves_to_newest_without_duplicate(store):
+    rec = lambda i: {"tryon_id": f"t{i}", "look_id": f"l{i}", "garment_ids": ["g"], "image_url": "u", "created_at": "x"}
+    store.add_tryon("u_ana", rec(0))
+    store.add_tryon("u_ana", rec(1))
+    store.add_tryon("u_ana", rec(0))
+    assert [t["tryon_id"] for t in store.tryons_of("u_ana")] == ["t0", "t1"]
