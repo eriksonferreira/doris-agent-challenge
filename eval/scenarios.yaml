@@ -42,7 +42,7 @@ scenarios:
         checks:
           - turn_completed
           - {max_tool_calls: 4}
-          - {judge: "Comenta o último look da usuária com base na imagem, de forma honesta e específica, com uma sugestão prática."}
+          - {judge: "Comenta o último look da usuária com base na imagem (cores, peças, caimento), de forma honesta e específica, com uma sugestão prática. Nota 1 se a resposta disser que não conseguiu ver o look ou não citar nada concreto dele."}
 
   - id: s4_memoria_entre_conversas
     description: Preferências ditas em uma conversa valem na próxima.
