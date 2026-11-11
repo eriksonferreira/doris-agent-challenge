@@ -38,6 +38,39 @@ def openrouter_usage(api_key: str, http: httpx.Client) -> float | None:
         return None
 
 
+def wait_ready(http: httpx.Client, agent_url: str | None, timeout_s: float = 60.0) -> bool:
+    """Poll the proxy's /health (and the agent's, when reachable from here) until both answer 200."""
+    deadline = time.monotonic() + timeout_s
+    targets = [lambda: http.get("/health")]
+    if agent_url:
+        targets.append(lambda: httpx.get(f"{agent_url.rstrip('/')}/health", timeout=2))
+    while True:
+        try:
+            if all(probe().status_code == 200 for probe in targets):
+                return True
+        except httpx.HTTPError:
+            pass
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.5)
+
+
+def settle_usage(read, interval_s: float = 5, max_wait_s: float = 60, sleep=time.sleep) -> float | None:
+    """OpenRouter usage lags a little: read until two consecutive readings agree (capped)."""
+    prev = read()
+    if prev is None:
+        return None
+    waited = 0.0
+    while waited < max_wait_s:
+        sleep(interval_s)
+        waited += interval_s
+        cur = read()
+        if cur is None or cur == prev:
+            return prev
+        prev = cur
+    return prev
+
+
 def drive_turn(http: httpx.Client, payload: dict) -> dict:
     t0 = time.monotonic()
     events, status, error = [], None, None
@@ -70,14 +103,20 @@ def drive_turn(http: httpx.Client, payload: dict) -> dict:
 
 def run(proxy_url: str, scenario_paths: list[Path], out_dir: Path, run_id: str | None = None,
         openrouter_key: str | None = None, judge_key: str | None = None,
-        judge_model: str = "google/gemini-3.8-flash", http: httpx.Client | None = None) -> dict:
+        judge_model: str = "google/gemini-3.8-flash", http: httpx.Client | None = None,
+        agent_url: str | None = None, ready_timeout_s: float = 60.0) -> dict:
     scenarios = load_scenarios(scenario_paths)
     run_id = run_id or datetime.now(timezone.utc).strftime("%m%d%H%M%S")
     http = http or httpx.Client(base_url=proxy_url, timeout=CLIENT_TIMEOUT_S)
     ext = httpx.Client(timeout=60)
     started = time.monotonic()
 
-    http.post("/admin/reset")
+    if not wait_ready(http, agent_url, ready_timeout_s):
+        print("aviso: proxy/agente não responderam ao /health; rodando mesmo assim", file=sys.stderr)
+    try:
+        http.post("/admin/reset")
+    except httpx.HTTPError as e:
+        print(f"aviso: não foi possível resetar o proxy: {e}", file=sys.stderr)
     usage_before = openrouter_usage(openrouter_key, ext) if openrouter_key else None
 
     # Phase 1 — drive every turn.
@@ -92,18 +131,24 @@ def run(proxy_url: str, scenario_paths: list[Path], out_dir: Path, run_id: str |
             driven.append({"scenario": s, "index": index, "turn_index": turn_index, "turn": t, "payload": payload,
                            **drive_turn(http, payload)})
 
-    usage_after = openrouter_usage(openrouter_key, ext) if openrouter_key else None
+    usage_after = settle_usage(lambda: openrouter_usage(openrouter_key, ext)) if openrouter_key else None
     cost = round(usage_after - usage_before, 6) if usage_before is not None and usage_after is not None else None
 
     # Phase 2 — pair driven turns with logged turns, build TurnResults.
+    # Chat history is per conversation; prior tool calls are per user (memory may reuse ids across chats).
     logs: dict[str, list[dict]] = {}
-    history: dict[tuple[int, str], dict] = {}
+    chat_hist: dict[str, dict] = {}
+    user_calls: dict[tuple[int, str], list[dict]] = {}
     results: list[tuple[dict, TurnResult]] = []
     for d in driven:
         cid = d["payload"]["conversation_id"]
         if cid not in logs:
-            logs[cid] = http.get("/admin/log", params={"conversation_id": cid}).json()["turns"]
-        h = history.setdefault((d["index"], cid), {"calls": [], "user": [], "transcript": [], "logged": 0})
+            try:
+                logs[cid] = http.get("/admin/log", params={"conversation_id": cid}).json()["turns"]
+            except (httpx.HTTPError, ValueError, KeyError):
+                logs[cid] = []
+        h = chat_hist.setdefault(cid, {"user": [], "transcript": [], "logged": 0})
+        prior = user_calls.setdefault((d["index"], d["payload"]["user_id"]), [])
         calls = []
         if d["status"] == 200 and h["logged"] < len(logs[cid]):
             calls = logs[cid][h["logged"]]["calls"]
@@ -117,8 +162,8 @@ def run(proxy_url: str, scenario_paths: list[Path], out_dir: Path, run_id: str |
             message=d["turn"]["message"], events=d["events"], text=text,
             artifacts=[e["artifact"] for e in d["events"] if e.get("type") == "artifact"],
             outcome=d["outcome"], error=d["error"], duration_s=d["duration_s"], calls=calls,
-            prior_calls=list(h["calls"]), user_messages=list(h["user"]), transcript=list(h["transcript"]))))
-        h["calls"] += calls
+            prior_calls=list(prior), user_messages=list(h["user"]), transcript=list(h["transcript"]))))
+        prior += calls
 
     # Phase 3 — checks (judge last).
     judge = make_judge(judge_key, judge_model, ext) if judge_key else None
@@ -173,7 +218,8 @@ def main(argv: list[str] | None = None, http: httpx.Client | None = None) -> int
     report = run(a.proxy, a.scenarios or [Path(__file__).parent / "scenarios.yaml"], a.out,
                  openrouter_key=os.environ.get("OPENROUTER_API_KEY") or None,
                  judge_key=os.environ.get("JUDGE_API_KEY") or None,
-                 judge_model=os.environ.get("JUDGE_MODEL") or "google/gemini-3.8-flash", http=http)
+                 judge_model=os.environ.get("JUDGE_MODEL") or "google/gemini-3.8-flash", http=http,
+                 agent_url=os.environ.get("AGENT_URL") or None)
     print(render_markdown(report))
     return 1 if report["summary"]["failed"] else 0
 

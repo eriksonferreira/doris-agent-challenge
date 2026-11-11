@@ -62,6 +62,8 @@ docker compose up --build         # proxy + agente
 docker compose run --rm eval      # roda os cenários; relatório em eval/out/report.md
 ```
 
+- O eval espera o `/health` do proxy e do agente, **reseta o log e as conversas do proxy** (conversas abertas no
+  navegador param de funcionar; clique em "Nova conversa") e roda os cenários.
 - O relatório mostra cada check como ✅ / ❌ / ⏭ (não se aplica ou pulado). Os checks do tipo `judge` só rodam se
   `JUDGE_API_KEY` estiver preenchida (pode ser a mesma chave).
 - Para depurar: `GET http://localhost:3000/admin/log?conversation_id=<id>` mostra os turnos e as chamadas de tools
@@ -122,7 +124,8 @@ A chave que enviamos dá acesso a estes modelos na [OpenRouter](https://openrout
 
 ## Regras
 
-- Altere apenas `agent/`. Você pode adicionar serviços ao `docker-compose.yml` (banco, cache, tracing…).
+- Altere apenas `agent/` e o `docker-compose.yml`: você pode mudar o serviço `agent` (volumes, variáveis,
+  `depends_on`) e adicionar serviços (banco, cache, tracing…).
 - Não altere `proxy/`, `eval/`, `seed-images/`, os dados de teste ou `proxy/faults.json`: na avaliação usamos a
   nossa cópia deles.
 - O agente não pode chamar `/admin/*`. Esses endpoints existem só para depuração e para o eval.
@@ -149,7 +152,7 @@ Mais do que cabe em 4 horas, sem ordem de prioridade:
 - Feedback de progresso durante as tools.
 - Controle e medição de custo.
 - Observabilidade (traces, métricas, logs).
-- Proteção contra prompt injection vinda dos dados das tools.
+- Proteção contra prompt injection.
 - Refinamento em vários turnos ("não gostei, tem em azul?").
 - Uso de imagens enviadas pela pessoa.
 - Testes automatizados e uma avaliação própria.

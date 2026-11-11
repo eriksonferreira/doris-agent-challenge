@@ -25,7 +25,7 @@ class TurnResult:
     error: str | None
     duration_s: float
     calls: list[dict]
-    prior_calls: list[dict]
+    prior_calls: list[dict]  # earlier calls by the same user in this scenario (any chat)
     user_messages: list[str]
     transcript: list[tuple[str, str]]
 
@@ -138,6 +138,11 @@ def retry_policy(t: TurnResult, arg) -> CheckResult:
 
 def artifact_shown(t: TurnResult, kind) -> CheckResult:
     kinds = [a.get("kind") for a in t.artifacts]
+    if kind == "TRYON_CARD":  # only a try-on generated in this turn counts, not an old look
+        fresh = {_data(c).get(k) for c in t.calls if c["tool"] == "tryon" and _ok(c) for k in ("tryon_id", "look_id")}
+        shown = [a.get("tryon_id") for a in t.artifacts if a.get("kind") == "TRYON_CARD"]
+        return CheckResult("artifact_shown", any(s in fresh for s in shown),
+                           f"try-ons mostrados: {shown}; gerados neste turno: {sorted(x for x in fresh if x)}")
     return CheckResult("artifact_shown", kind in kinds, f"mostrados: {kinds}")
 
 
@@ -167,6 +172,8 @@ def grounded(t: TurnResult, _) -> CheckResult:
     known = [p["price"] for c in t.prior_calls + t.calls if c["tool"] == "search_by_text" and _ok(c)
              for p in _data(c).get("products", [])]
     known += [_parse(n) for m in t.user_messages for n in NUMBER.findall(m)]
+    known += [op(a, b) for i, a in enumerate(known) for b in known[i + 1:] for op in (lambda x, y: x + y,
+                                                                                      lambda x, y: abs(x - y))]
     invented = [m for m in PRICE.findall(t.text) if not any(abs(_parse(m) - k) <= 0.5 for k in known)]
     return CheckResult("grounded", not invented, f"preços sem origem: {invented}" if invented else "preços conferem")
 

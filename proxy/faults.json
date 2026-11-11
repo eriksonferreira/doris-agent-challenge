@@ -1,6 +1,6 @@
 {
   "rules": [
-    {"tool": "search_by_text", "match": {"query": "jaqueta\\s+jeans"}, "effect": "empty"},
+    {"tool": "search_by_text", "match": {"query": "jaquetas?\\b.*\\bjeans|jeans\\b.*\\bjaquetas?"}, "effect": "empty"},
     {"tool": "tryon", "match": {"item_ids": "^p07$"},
      "effect": {"error": {"status": 503, "code": "upstream_timeout", "retryable": true}}, "times": 1}
   ]

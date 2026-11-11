@@ -174,3 +174,20 @@ def test_judge_low_score_and_garbage():
 def test_vacuous_checks_are_skipped():
     assert check("tool_order", turn(calls=[SEARCH_P01])) is None
     assert check({"retry_policy": {"max_retries": 2}}, turn(calls=[SEARCH_P01, TRYON_G1])) is None
+
+
+def test_grounded_accepts_sums_and_differences():
+    two = call("search_by_text", data={"products": [{"search_item_id": "p01", "price": 249.9},
+                                                    {"search_item_id": "p08", "price": 219.0}]})
+    t = lambda text: turn(calls=[two], user_messages=["algo até R$300"], text=text)
+    assert check("grounded", t("Juntas, as duas saem por R$ 468,90.")) is True
+    assert check("grounded", t("Sobra R$ 50,10 do seu orçamento.")) is True
+    assert check("grounded", t("Custa R$ 123,45.")) is False
+
+
+def test_artifact_shown_tryon_requires_tryon_this_turn():
+    old_look = turn(artifacts=[{"kind": "TRYON_CARD", "tryon_id": "look_ana_1", "tags": []}])
+    assert check({"artifact_shown": "TRYON_CARD"}, old_look) is False
+    fresh = turn(calls=[call("tryon", {"garment_ids": ["g1"]}, data={"tryon_id": "t1", "look_id": "l1"})],
+                 artifacts=[{"kind": "TRYON_CARD", "tryon_id": "l1", "tags": []}])
+    assert check({"artifact_shown": "TRYON_CARD"}, fresh) is True

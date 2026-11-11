@@ -72,6 +72,8 @@ async def _pump_agent(agent: httpx.AsyncClient, body: dict, out: asyncio.Queue) 
         out.put_nowait(_error("agent_unavailable", f"não foi possível conectar ao agente: {e}"))
     except httpx.HTTPError as e:
         out.put_nowait(_error("agent_error", f"falha na conexão com o agente: {e}"))
+    except Exception as e:  # noqa: BLE001 — never leave the client waiting for the turn cut
+        out.put_nowait(_error("agent_error", f"erro inesperado ao falar com o agente: {e!r}"))
 
 
 async def _stream(st, body: ChatIn, turn_id: int, out: asyncio.Queue):

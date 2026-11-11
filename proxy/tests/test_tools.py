@@ -170,3 +170,23 @@ def test_users_and_health(client):
 
 def test_seed_images_served(client):
     assert client.get("/seed-images/products/p01.svg").status_code == 200
+
+
+def test_invalid_tool_body_is_logged(client):
+    cid = conv(client)
+    r = client.post("/tools/tryon", json={"conversation_id": cid, "garment_id": "x"})
+    assert r.status_code == 400 and r.json()["error"]["code"] == "invalid_request"
+    calls = client.get("/admin/log", params={"conversation_id": cid}).json()["calls_outside_turns"]
+    assert [(c["tool"], c["status"], c["request"]) for c in calls] == [("tryon", 400, {"garment_id": "x"})]
+
+
+def test_invalid_body_without_conversation_not_logged(client):
+    assert client.post("/tools/tryon", json={"garment_id": "x"}).status_code == 400
+    assert client.get("/admin/log").json() == {"turns": [], "calls_outside_turns": []}
+
+
+def test_public_fault_jaqueta_jeans_wording_variants(client):
+    cid = conv(client)
+    for q in ("jaqueta de jeans", "Jaquetas jeans", "jeans jaqueta"):
+        assert post(client, "search_by_text", cid, query=q).json()["data"]["products"] == [], q
+    assert post(client, "search_by_text", cid, query="jaqueta de couro").json()["data"]["products"]

@@ -27,7 +27,15 @@ def create_app(settings: Settings, agent_transport: httpx.AsyncBaseTransport | N
 
     @app.exception_handler(RequestValidationError)
     async def invalid(request: Request, exc: RequestValidationError):
-        return JSONResponse(tools.error_body("invalid_request", str(exc.errors())), status_code=400)
+        payload = tools.error_body("invalid_request", str(exc.errors()))
+        body = exc.body if isinstance(exc.body, dict) else {}
+        cid = body.get("conversation_id")
+        if request.url.path.startswith("/tools/") and isinstance(cid, str):
+            store = app.state.store
+            request_fields = {k: v for k, v in body.items() if k != "conversation_id"}
+            store.log_call(cid, store.active_turn(cid), request.url.path.removeprefix("/tools/"), request_fields,
+                           400, payload, 0)
+        return JSONResponse(payload, status_code=400)
 
     @app.get("/health")
     async def health():

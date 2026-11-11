@@ -103,6 +103,7 @@ async def run_tool(request: Request, tool: str, body: Base, handler: Callable) -
     cid = body.conversation_id
     req = body.model_dump(exclude={"conversation_id"})
     t0 = time.monotonic()
+    turn_id = st.store.active_turn(cid)  # the turn the call started in, even if it ends first
     user = st.store.user_of(cid)
     if user is None:
         status, payload = 404, error_body("conversation_not_found", f"conversa {cid} não encontrada")
@@ -116,7 +117,7 @@ async def run_tool(request: Request, tool: str, body: Base, handler: Callable) -
                 status, payload = 200, handler(st, user, cid, req, effect.kind == "empty")
             except ToolError as e:
                 status, payload = e.status, error_body(e.code, e.message, e.retryable)
-    st.store.log_call(cid, st.store.active_turn(cid), tool, req, status, payload,
+    st.store.log_call(cid, turn_id, tool, req, status, payload,
                       int((time.monotonic() - t0) * 1000))
     return JSONResponse(payload, status_code=status)
 

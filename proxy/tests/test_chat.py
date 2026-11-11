@@ -160,3 +160,31 @@ async def test_malformed_line_skipped(tmp_path):
     async with client_for(app) as c:
         evs = events_of(await c.post("/chat", json=body()))
     assert evs == [{"type": "text", "delta": "ok"}, {"type": "done"}]
+
+
+async def test_call_logged_under_turn_where_it_started(tmp_path):
+    faults = tmp_path / "f.json"
+    faults.write_text(json.dumps({"rules": [{"tool": "profile", "match": {}, "effect": {"delay_ms": 300}}]}))
+    app = wire(tmp_path, lambda b, p: say({"type": "done"}), faults_file=faults)
+    cid = str(uuid.uuid4())
+    store = app.state.store
+    store.claim_conversation(cid, "u_ana")
+    turn = store.begin_turn(cid, "u_ana", "oi")
+    async with client_for(app) as c:
+        slow = asyncio.create_task(c.post("/tools/profile", json={"conversation_id": cid}))
+        await asyncio.sleep(0.05)
+        store.end_turn(turn, "turn_timeout", "", 0)
+        await slow
+        log = (await c.get("/admin/log", params={"conversation_id": cid})).json()
+    assert [c["tool"] for c in log["turns"][0]["calls"]] == ["profile"]
+    assert log["calls_outside_turns"] == []
+
+
+async def test_unexpected_agent_failure_is_agent_error(tmp_path):
+    def broken(request):
+        raise RuntimeError("boom")
+
+    app = create_app(make_settings(tmp_path, turn_timeout_s=2), agent_transport=httpx.MockTransport(broken))
+    async with client_for(app) as c:
+        evs = events_of(await c.post("/chat", json=body()))
+    assert evs[-1]["type"] == "error" and evs[-1]["code"] == "agent_error"

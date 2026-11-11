@@ -23,6 +23,7 @@ services:
     env_file: .env
     environment:
       PROXY_URL: http://proxy:3000
+      AGENT_URL: http://agent:8000
     volumes:
       - ./eval/out:/out
     depends_on: [proxy]
