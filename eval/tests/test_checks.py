@@ -191,3 +191,9 @@ def test_artifact_shown_tryon_requires_tryon_this_turn():
     fresh = turn(calls=[call("tryon", {"garment_ids": ["g1"]}, data={"tryon_id": "t1", "look_id": "l1"})],
                  artifacts=[{"kind": "TRYON_CARD", "tryon_id": "l1", "tags": []}])
     assert check({"artifact_shown": "TRYON_CARD"}, fresh) is True
+
+
+def test_no_repeat_ignores_failed_attempts():
+    failed = call("tryon", {"garment_ids": ["g1"]}, status=503, error=RETRYABLE)
+    ok = call("tryon", {"garment_ids": ["g1"]}, data={"tryon_id": "t1"})
+    assert check("no_repeat", turn(calls=[failed, failed, ok])) is True

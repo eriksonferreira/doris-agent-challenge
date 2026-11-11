@@ -81,7 +81,8 @@ def max_tool_calls(t: TurnResult, n) -> CheckResult:
 def no_repeat(t: TurnResult, _) -> CheckResult:
     counts: dict[str, int] = {}
     for c in t.calls:
-        counts[_signature(c)] = counts.get(_signature(c), 0) + 1
+        if _ok(c):  # failed attempts are judged by retry_policy, not as repeats
+            counts[_signature(c)] = counts.get(_signature(c), 0) + 1
     worst = max(counts.values(), default=0)
     return CheckResult("no_repeat", worst <= 2, f"maior repetição de uma chamada idêntica: {worst}")
 
