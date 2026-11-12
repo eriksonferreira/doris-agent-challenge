@@ -145,6 +145,7 @@ Resposta: `{ "ok": true }`.
 - `GET /admin/log?conversation_id=<id>`: turnos (mensagem, texto final, resultado, duração) e as chamadas de tools
   de cada turno, com pedido, status e resposta.
 - `POST /admin/reset`: apaga conversas, logs e contadores de falhas. Os dados de teste não mudam.
+- `GET /conversations?user_id=` e `GET /conversations/<id>/messages`: histórico usado pela barra lateral do frontend.
 
 Imagens dos dados de teste também ficam em `http://localhost:3000/seed-images/…`, mas as URLs que as tools devolvem
 são públicas, para que os modelos consigam abri-las.

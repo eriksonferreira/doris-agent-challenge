@@ -37,6 +37,10 @@ class Store:
         self.db = sqlite3.connect(db_path, check_same_thread=False, isolation_level=None)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        try:  # databases created before the UI history existed
+            self.db.execute("ALTER TABLE turns ADD COLUMN events_json TEXT")
+        except sqlite3.OperationalError:
+            pass
         self._active: dict[str, int] = {}
 
     def claim_conversation(self, conversation_id: str, user_id: str) -> bool:
@@ -59,12 +63,13 @@ class Store:
     def active_turn(self, conversation_id: str) -> int | None:
         return self._active.get(conversation_id)
 
-    def end_turn(self, turn_id: int, outcome: str, text: str, n_artifacts: int) -> None:
+    def end_turn(self, turn_id: int, outcome: str, text: str, n_artifacts: int, events: list[dict] | None = None) -> None:
         row = self.db.execute("SELECT conversation_id, t0 FROM turns WHERE id = ?", (turn_id,)).fetchone()
         if row is None:
             return
-        self.db.execute("UPDATE turns SET outcome = ?, text = ?, n_artifacts = ?, duration_ms = ? WHERE id = ?",
-                        (outcome, text, n_artifacts, int((time.monotonic() - row["t0"]) * 1000), turn_id))
+        self.db.execute("UPDATE turns SET outcome = ?, text = ?, n_artifacts = ?, duration_ms = ?, events_json = ?"
+                        " WHERE id = ?", (outcome, text, n_artifacts, int((time.monotonic() - row["t0"]) * 1000),
+                                          _dumps(events or []), turn_id))
         if self._active.get(row["conversation_id"]) == turn_id:
             del self._active[row["conversation_id"]]
 
@@ -120,6 +125,23 @@ class Store:
             turn["calls"] = [c for c in calls if c["turn_id"] == r["id"]]
             turns.append(turn)
         return {"turns": turns, "calls_outside_turns": [c for c in calls if c["turn_id"] is None]}
+
+    def conversations(self, user_id: str) -> list[dict]:
+        """A user's conversations for the UI sidebar, most recently active first."""
+        rows = self.db.execute(
+            "SELECT conversation_id, MIN(started_at) AS started_at, MAX(started_at) AS updated_at, COUNT(*) AS turns,"
+            " (SELECT message FROM turns t2 WHERE t2.conversation_id = t.conversation_id ORDER BY id LIMIT 1) AS first"
+            " FROM turns t WHERE user_id = ? GROUP BY conversation_id ORDER BY MAX(id) DESC", (user_id,)).fetchall()
+        title = lambda m: m if len(m) <= 60 else m[:60].rstrip() + "…"
+        return [{"conversation_id": r["conversation_id"], "title": title(r["first"] or ""), "turns": r["turns"],
+                 "started_at": r["started_at"], "updated_at": r["updated_at"]} for r in rows]
+
+    def messages(self, conversation_id: str) -> list[dict]:
+        """Every finished turn of a conversation with the exact events the browser received, for replay."""
+        rows = self.db.execute("SELECT id, message, outcome, started_at, events_json FROM turns"
+                               " WHERE conversation_id = ? AND outcome IS NOT NULL ORDER BY id", (conversation_id,))
+        return [{"turn_id": r["id"], "message": r["message"], "outcome": r["outcome"], "started_at": r["started_at"],
+                 "events": json.loads(r["events_json"] or "[]")} for r in rows]
 
     def reset(self) -> None:
         for table in ("conversations", "turns", "calls", "garments", "tryons"):

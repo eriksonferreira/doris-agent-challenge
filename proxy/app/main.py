@@ -6,7 +6,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app import admin, chat, tools
+from app import admin, chat, history, tools
 from app.bus import Bus
 from app.faults import Faults
 from app.seed import load_seed
@@ -55,6 +55,7 @@ def create_app(settings: Settings, agent_transport: httpx.AsyncBaseTransport | N
     app.include_router(tools.router)
     app.include_router(chat.router)
     app.include_router(admin.router)
+    app.include_router(history.router)
     app.mount("/seed-images", StaticFiles(directory=settings.images_dir, check_dir=False), name="seed-images")
     return app
 

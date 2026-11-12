@@ -9,8 +9,24 @@
           --me: #efe7dd; --err: #b3261e; }
   * { box-sizing: border-box; }
   body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); }
-  .app { max-width: 760px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; background: var(--panel);
+  .shell { max-width: 1040px; margin: 0 auto; display: flex; min-height: 100vh; }
+  #history { width: 260px; flex-shrink: 0; border-left: 1px solid var(--line); background: #fbfaf8; padding: 12px 8px;
+             overflow-y: auto; max-height: 100vh; position: sticky; top: 0; }
+  #history h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 4px 8px 8px; }
+  #history button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px; border-radius: 8px; }
+  #history button:hover { background: #f0ece6; }
+  #history button.active { background: var(--me); }
+  #history .title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #history .when { display: block; font-size: 12px; color: var(--muted); }
+  #history .empty { color: var(--muted); font-size: 13px; padding: 8px; }
+  #toggle-history { display: none; }
+  .app { flex: 1; min-width: 0; min-height: 100vh; display: flex; flex-direction: column; background: var(--panel);
          border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+  @media (max-width: 720px) {
+    #toggle-history { display: inline-block; }
+    #history { display: none; position: fixed; inset: 0 30% 0 0; z-index: 10; max-height: none; box-shadow: 0 0 24px #0003; }
+    #history.open { display: block; }
+  }
   header { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
   header h1 { font-size: 17px; margin: 0 auto 0 0; }
   header small { width: 100%; color: var(--muted); font-size: 12px; }
@@ -57,8 +73,11 @@
 </style>
 </head>
 <body>
+<div class="shell">
+<aside id="history" aria-label="Conversas"></aside>
 <div class="app">
   <header>
+    <button id="toggle-history" type="button" aria-controls="history">Conversas</button>
     <h1>Doris</h1>
     <label>Usuário <select id="user-select" aria-label="Usuário"></select></label>
     <button id="new-chat" type="button">Nova conversa</button>
@@ -73,6 +92,7 @@
     <button id="send" class="primary" type="submit">Enviar</button>
   </form>
 </div>
+</div>
 <template id="typing-tpl"><div class="typing" aria-label="Doris está pensando"><span></span><span></span><span></span></div></template>
 <script>
 const $ = (id) => document.getElementById(id);
@@ -86,11 +106,49 @@ function el(tag, cls, text) {
   return n;
 }
 
-function newConversation() {
-  conversationId = crypto.randomUUID();
+function setConversation(id) {
+  conversationId = id;
   $("messages").replaceChildren();
-  $("conversation").textContent = "conversa " + conversationId;
+  $("conversation").textContent = "conversa " + id;
   clearImage();
+  for (const b of $("history").querySelectorAll("button")) b.classList.toggle("active", b.dataset.id === id);
+}
+
+function newConversation() {
+  setConversation(crypto.randomUUID());
+  history.replaceState(null, "", location.pathname);
+}
+
+async function loadHistory() {
+  const list = await fetch("/conversations?user_id=" + encodeURIComponent($("user-select").value)).then((r) => r.json());
+  const aside = $("history");
+  aside.replaceChildren(el("h2", "", "Conversas"));
+  if (!list.length) aside.append(el("div", "empty", "Nenhuma conversa ainda."));
+  for (const c of list) {
+    const b = el("button"); b.type = "button"; b.dataset.id = c.conversation_id;
+    b.append(el("span", "title", c.title || "(sem título)"),
+             el("span", "when", new Date(c.updated_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })));
+    b.classList.toggle("active", c.conversation_id === conversationId);
+    b.addEventListener("click", () => { openConversation(c.conversation_id); aside.classList.remove("open"); });
+    aside.append(b);
+  }
+}
+
+async function openConversation(id) {
+  const res = await fetch("/conversations/" + encodeURIComponent(id) + "/messages");
+  if (!res.ok) { newConversation(); return false; }
+  const page = await res.json();
+  if ($("user-select").value !== page.user_id) { $("user-select").value = page.user_id; await loadHistory(); }
+  setConversation(id);
+  history.replaceState(null, "", "#" + id);
+  for (const turn of page.turns) {  // replay exactly what the browser saw live
+    $("messages").append(el("div", "me", turn.message));
+    const r = reply();
+    for (const ev of turn.events) handle(ev, r);
+    if (r.typing) r.typing.remove();
+  }
+  scroll();
+  return true;
 }
 
 function clearImage() { image = null; $("file").value = ""; $("attachment").textContent = ""; }
@@ -197,6 +255,8 @@ async function send(message) {
     handle({ type: "error", code: "rede", message: String(e) }, r);
   } finally {
     setBusy(false);
+    history.replaceState(null, "", "#" + conversationId);
+    loadHistory();
   }
 }
 
@@ -219,11 +279,14 @@ $("file").addEventListener("change", () => {
   reader.readAsDataURL(f);
 });
 $("new-chat").addEventListener("click", newConversation);
-$("user-select").addEventListener("change", newConversation);
+$("user-select").addEventListener("change", () => { newConversation(); loadHistory(); });
+$("toggle-history").addEventListener("click", () => $("history").classList.toggle("open"));
 
-fetch("/users").then((r) => r.json()).then((users) => {
+fetch("/users").then((r) => r.json()).then(async (users) => {
   for (const u of users) { const o = el("option", "", u.name); o.value = u.user_id; $("user-select").append(o); }
-  newConversation();
+  const fromUrl = location.hash.slice(1);
+  if (!(fromUrl && await openConversation(fromUrl))) newConversation();
+  loadHistory();
 });
 </script>
 </body>

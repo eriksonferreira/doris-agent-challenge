@@ -132,7 +132,8 @@ A chave que enviamos dá acesso a estes modelos na [OpenRouter](https://openrout
   `depends_on`) e adicionar serviços (banco, cache, tracing…).
 - Não altere `proxy/`, `eval/`, `seed-images/`, os dados de teste ou `proxy/faults.json`: na avaliação usamos a
   nossa cópia deles.
-- O agente não pode chamar `/admin/*`. Esses endpoints existem só para depuração e para o eval.
+- O agente não pode chamar `/admin/*` nem `/conversations/*`. Esses endpoints existem só para depuração, para o eval e
+  para o histórico do frontend.
 - A única chamada externa permitida é para a OpenRouter, com a chave fornecida. Todo o resto roda dentro do compose.
 - Nunca faça commit da chave.
 

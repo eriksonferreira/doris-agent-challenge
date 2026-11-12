@@ -82,6 +82,7 @@ async def _stream(st, body: ChatIn, turn_id: int, out: asyncio.Queue):
     forwarded = {**body.model_dump(), "profile": {"name": u["name"], "gender": u["gender"], "city": u["city"]}}
     pump = asyncio.create_task(_pump_agent(st.agent, forwarded, out))
     text: list[str] = []
+    sent: list[dict] = []  # exactly what the browser receives, saved for the UI history
     n_artifacts, outcome = 0, "error"
     try:
         async with asyncio.timeout(st.settings.turn_timeout_s):
@@ -95,18 +96,22 @@ async def _stream(st, body: ChatIn, turn_id: int, out: asyncio.Queue):
                     while not out.empty():  # artifacts published just before done
                         extra = out.get_nowait()
                         n_artifacts += extra["type"] == "artifact"
+                        sent.append(extra)
                         yield _sse(extra)
                     outcome = "done"
+                sent.append(ev)
                 yield _sse(ev)
                 if ev["type"] in ("done", "error"):
                     break
     except TimeoutError:
         outcome = "turn_timeout"
-        yield _sse(_error("turn_timeout", f"o turno passou de {st.settings.turn_timeout_s:g}s e foi encerrado"))
+        timeout_event = _error("turn_timeout", f"o turno passou de {st.settings.turn_timeout_s:g}s e foi encerrado")
+        sent.append(timeout_event)
+        yield _sse(timeout_event)
     finally:
         pump.cancel()
         st.bus.unsubscribe(cid)
-        st.store.end_turn(turn_id, outcome, "".join(text), n_artifacts)
+        st.store.end_turn(turn_id, outcome, "".join(text), n_artifacts, sent)
 
 
 @router.post("/chat")
