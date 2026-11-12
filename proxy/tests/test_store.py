@@ -93,3 +93,11 @@ def test_tryon_readd_moves_to_newest_without_duplicate(store):
     store.add_tryon("u_ana", rec(1))
     store.add_tryon("u_ana", rec(0))
     assert [t["tryon_id"] for t in store.tryons_of("u_ana")] == ["t0", "t1"]
+
+
+def test_conversations_without_content_are_not_listed(store):
+    store.end_turn(store.begin_turn("empty", "u_ana", "oi"), "error", "", 0)  # no events stored
+    store.end_turn(store.begin_turn("full", "u_ana", "oi"), "done", "olá", 0,
+                   [{"type": "text", "delta": "olá"}, {"type": "done"}])
+    store.begin_turn("open", "u_ana", "ainda respondendo")  # unfinished turn
+    assert [c["conversation_id"] for c in store.conversations("u_ana")] == ["full"]

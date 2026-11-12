@@ -131,7 +131,8 @@ class Store:
         rows = self.db.execute(
             "SELECT conversation_id, MIN(started_at) AS started_at, MAX(started_at) AS updated_at, COUNT(*) AS turns,"
             " (SELECT message FROM turns t2 WHERE t2.conversation_id = t.conversation_id ORDER BY id LIMIT 1) AS first"
-            " FROM turns t WHERE user_id = ? GROUP BY conversation_id ORDER BY MAX(id) DESC", (user_id,)).fetchall()
+            " FROM turns t WHERE user_id = ? AND events_json IS NOT NULL AND events_json != '[]'"  # only replayable turns
+            " GROUP BY conversation_id ORDER BY MAX(id) DESC", (user_id,)).fetchall()
         title = lambda m: m if len(m) <= 60 else m[:60].rstrip() + "…"
         return [{"conversation_id": r["conversation_id"], "title": title(r["first"] or ""), "turns": r["turns"],
                  "started_at": r["started_at"], "updated_at": r["updated_at"]} for r in rows]
