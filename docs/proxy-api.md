@@ -47,7 +47,7 @@ preço, tamanho ou cor**: se a pessoa pediu "até R$300", quem filtra é o agent
 { "ok": true, "data": { "products": [
   { "search_item_id": "p01", "order": 0, "name": "Camisa de linho branca", "store": "Ateliê Maré",
     "price": 249.9, "currency_code": "BRL", "currency_symbol": "R$", "url": "https://loja.exemplo/p01",
-    "image_url": "https://…/products/p01.svg",
+    "image_url": "https://…/products/p01.jpg",
     "description": "Camisa de linho leve, manga longa, corte reto. Ótima para dias quentes." }
 ] } }
 ```
@@ -61,7 +61,7 @@ Cria a peça (garment) a partir de um resultado da busca. É necessária antes d
 ```
 
 ```json
-{ "ok": true, "data": { "garment_id": "0191a7e3-…", "ghost_image_url": "https://…/ghosts/p01.svg",
+{ "ok": true, "data": { "garment_id": "0191a7e3-…", "ghost_image_url": "https://…/products/p01.jpg",
   "type": "TOP", "category": "shirt", "status": "PROCESSED", "metadata": {} } }
 ```
 
@@ -78,7 +78,7 @@ Veste **uma** peça no avatar da pessoa (~8–12 s). A peça pode vir do `garmen
 
 ```json
 { "ok": true, "data": { "tryon_id": "cd3aac42-…", "look_id": "5b59efc0-…", "garment_ids": ["0191a7e3-…"],
-  "image_url": "https://…/tryons/u_ana/p01.svg", "created_at": "2026-11-11T22:53:54+00:00",
+  "image_url": "https://…/tryons/u_ana/p01.jpg", "created_at": "2026-11-11T22:53:54+00:00",
   "status": "PROCESSED", "avatar_id": "avatar_u_ana", "avatar_pose": "NORMAL", "is_saved": false } }
 ```
 
@@ -89,7 +89,7 @@ a pessoa até o agente chamar `show_artifact`.
 
 ```json
 { "ok": true, "data": { "avatars": [ { "avatar_id": "avatar_u_ana", "lifecycle_status": "READY",
-  "poses": [ { "pose": "NORMAL", "status": "PROCESSED", "image_url": "https://…/avatars/u_ana.svg" } ] } ] } }
+  "poses": [ { "pose": "NORMAL", "status": "PROCESSED", "image_url": "https://…/avatars/u_ana.jpg" } ] } ] } }
 ```
 
 ## `POST /tools/looks`
@@ -103,7 +103,7 @@ Looks da pessoa, do mais recente para o mais antigo: primeiro os try-ons gerados
 ```json
 { "ok": true, "data": { "looks": [
   { "look_id": "look_ana_1", "garment_ids": ["w_ana_1"], "description": "Calça jeans do dia a dia",
-    "tryon_image_url": "https://…/tryons/u_ana/w_ana_1.svg", "created_at": "2026-11-01T14:00:00Z" }
+    "tryon_image_url": "https://…/tryons/u_ana/w_ana_1.jpg", "created_at": "2026-11-01T14:00:00Z" }
 ] } }
 ```
 
@@ -117,7 +117,7 @@ Peças que a pessoa já tem. Filtro opcional por tipo (`TOP`, `BOTTOM`, `DRESS`�
 
 ```json
 { "ok": true, "data": { "garments": [
-  { "garment_id": "w_ana_2", "type": "TOP", "category": "tshirt", "ghost_image_url": "https://…/ghosts/w_ana_2.svg",
+  { "garment_id": "w_ana_2", "type": "TOP", "category": "tshirt", "ghost_image_url": "https://…/garments/w_ana_2.jpg",
     "metadata": { "tags": ["camiseta", "branca"] } }
 ] } }
 ```
