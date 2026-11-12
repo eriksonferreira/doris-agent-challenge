@@ -101,17 +101,17 @@ def test_wardrobe_filter_by_type(client):
     assert [g["garment_id"] for g in garments] == ["w_ana_2", "w_ana_3", "w_ana_4"]
 
 
-def test_public_fault_tryon_p07(client):
+def test_fault_tryon_fails_once(client):
     cid = conv(client)
-    gid = make_garment(client, cid, "p07")
+    gid = make_garment(client, cid, "p03")
     first = post(client, "tryon", cid, garment_ids=[gid])
     assert first.status_code == 503
     assert first.json()["error"]["code"] == "upstream_timeout" and first.json()["error"]["retryable"] is True
     assert post(client, "tryon", cid, garment_ids=[gid]).status_code == 200
 
 
-def test_public_fault_jaqueta_jeans_empty(client):
-    r = post(client, "search_by_text", conv(client), query="jaqueta jeans")
+def test_fault_search_empty(client):
+    r = post(client, "search_by_text", conv(client), query="camisa xadrez")
     assert r.status_code == 200 and r.json()["data"]["products"] == []
 
 
@@ -184,8 +184,11 @@ def test_invalid_body_without_conversation_not_logged(client):
     assert client.get("/admin/log").json() == {"turns": [], "calls_outside_turns": []}
 
 
-def test_public_fault_jaqueta_jeans_wording_variants(client):
-    cid = conv(client)
-    for q in ("jaqueta de jeans", "Jaquetas jeans", "jeans jaqueta"):
-        assert post(client, "search_by_text", cid, query=q).json()["data"]["products"] == [], q
-    assert post(client, "search_by_text", cid, query="jaqueta de couro").json()["data"]["products"]
+def test_no_faults_without_rules_file(tmp_path):
+    from fastapi.testclient import TestClient
+    from app.main import create_app
+    from testkit import make_settings
+    c = TestClient(create_app(make_settings(tmp_path)))
+    cid = conv(c)
+    gid = make_garment(c, cid, "p03")
+    assert post(c, "tryon", cid, garment_ids=[gid]).status_code == 200

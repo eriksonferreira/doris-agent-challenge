@@ -11,7 +11,7 @@ class Settings:
     image_base_url: str = "https://raw.githubusercontent.com/dorisopensource/doris-agent-challenge/main/seed-images"
     seed_dir: Path = PROXY_DIR / "seed"
     images_dir: Path = PROXY_DIR.parent / "seed-images"
-    faults_file: Path | None = PROXY_DIR / "faults.json"
+    faults_file: Path | None = None  # no injected failures unless FAULTS_FILE points to a rules file
     catalog_overrides_file: Path | None = None
     db_path: str = "/data/proxy.db"
     turn_timeout_s: float = 100.0

@@ -38,20 +38,16 @@ O fluxo principal: a pessoa pede algo → o agente **busca** → **escolhe** bon
 
 Cenários:
 
-| # | Usuário | Mensagem | O que observamos |
-|---|---|---|---|
-| 1 | Ana | "Me acha uma camisa de linho branca até R$300" | Busca, respeito ao preço, apresentação dos produtos |
-| 2 | Bruno | "Tenho um casamento na praia sábado, o que eu visto?" | Fluxo completo até o try-on |
-| 3 | Carla | "O que você acha do meu último look?" | Opinião honesta sobre a imagem do look |
-| 4 | Ana | Conversa A: "Odeio amarelo, visto M e curto estilo minimalista." Conversa **nova** B: "Me sugere algo pra um jantar" | Memória entre conversas |
-| 5 | Ana | "Tem jaqueta jeans?" e depois "Quero provar a jaqueta de couro preta" | Falhas: busca vazia e try-on que falha uma vez |
-| 6 | Bruno | "Oi" e "Qual a capital da França?" | Conversa fora do tema |
+| # | Usuário | Mensagem |
+|---|---|---|
+| 1 | Ana | "Me acha uma camisa de linho branca até R$300" |
+| 2 | Bruno | "Tenho um casamento na praia sábado, o que eu visto?" |
+| 3 | Carla | "O que você acha do meu último look?" |
+| 4 | Ana | Conversa A: "Odeio amarelo, visto M e curto estilo minimalista." Depois, em uma conversa nova: "Me sugere algo pra um jantar" |
+| 5 | Ana | "Tem jaqueta jeans?" e depois "Quero provar a jaqueta de couro preta" |
+| 6 | Bruno | "Oi" e "Qual a capital da França?" |
 
-Qualidades que valorizamos: o agente é **robusto** (não entra em loop, lida bem com falhas e lentidão),
-**lembra da pessoa entre conversas**, **classifica as tarefas e usa modelos diferentes para tarefas diferentes**,
-**cuida do custo**, é **observável** e **dá feedback** do que está fazendo enquanto as tools trabalham.
-
-Os cenários que usamos na avaliação são **variações** destes, com outras palavras, outros usuários e outras falhas.
+Na avaliação usamos variações destes cenários.
 
 ## Como rodar
 
@@ -146,7 +142,7 @@ A chave que enviamos dá acesso a estes modelos na [OpenRouter](https://openrout
 
 - Altere apenas `agent/` e o `docker-compose.yml`: você pode mudar o serviço `agent` (volumes, variáveis,
   `depends_on`) e adicionar serviços (banco, cache, tracing…).
-- Não altere `proxy/`, `seed-images/`, os dados de teste ou `proxy/faults.json`: na avaliação usamos a
+- Não altere `proxy/`, `seed-images/` nem os dados de teste: na avaliação usamos a
   nossa cópia deles.
 - O agente não pode chamar `/admin/*` nem `/conversations/*`. Esses endpoints existem só para depuração, para a nossa
   avaliação e para o histórico do frontend.
@@ -159,29 +155,6 @@ Sua chave está aqui: **<LINK_ONETIMESECRET>**
 
 O link funciona **uma única vez**. Se ele disser que já foi visualizado, nos avise antes de continuar. A chave tem
 um limite de gasto e é revogada depois do prazo.
-
-## Backlog
-
-Mais do que cabe em 4 horas, sem ordem de prioridade:
-
-- Fluxo completo de busca → escolha → peça → try-on → mostrar.
-- Todos os cenários acima.
-- Memória de longo prazo da pessoa entre conversas.
-- Histórico da conversa e engenharia de contexto.
-- Classificação de intenção e roteamento entre modelos.
-- Tratamento de falhas, timeouts e limites de execução.
-- Feedback de progresso durante as tools.
-- Controle e medição de custo.
-- Observabilidade (traces, métricas, logs).
-- Proteção contra prompt injection.
-- Refinamento em vários turnos ("não gostei, tem em azul?").
-- Uso de imagens enviadas pela pessoa.
-- Testes automatizados e uma avaliação própria.
-
-## O que avaliamos
-
-Robustez · cuidado com custo · memória · observabilidade · prompts e engenharia de contexto · roteamento entre
-modelos · qualidade nos cenários e feedback das tools · engenharia de software e o seu README.
 
 ## Entrega
 
