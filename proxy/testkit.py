@@ -1,4 +1,4 @@
-"""Test helpers shared by proxy/tests and eval/tests. Not used by the running app."""
+"""Test helpers for proxy/tests. Not used by the running app."""
 from dataclasses import replace
 from pathlib import Path
 

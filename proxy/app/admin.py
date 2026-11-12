@@ -1,4 +1,4 @@
-"""Debug/eval endpoints. Agents must not call these (README rule)."""
+"""Debug endpoints (and our evaluation). Agents must not call these (README rule)."""
 from fastapi import APIRouter, Request
 
 router = APIRouter(prefix="/admin")

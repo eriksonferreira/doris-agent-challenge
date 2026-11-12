@@ -13,7 +13,6 @@ Neste repositório você já recebe tudo **menos o agente**:
   guarda-roupa, looks…).
 - **Dados de teste**: 3 usuários (Ana, Bruno e Carla), cada um com avatar, guarda-roupa e looks anteriores, e um
   catálogo de produtos fictícios.
-- **Eval**: um runner que executa os cenários abaixo contra o seu agente e gera um relatório.
 
 ```
 frontend ──▶ proxy /chat ──▶ seu agente (agent/)
@@ -37,7 +36,7 @@ Construir o agente em `agent/`.
 O fluxo principal: a pessoa pede algo → o agente **busca** → **escolhe** bons itens → **cria a peça**
 (`garment_creation`) → gera o **try-on** → **mostra** o resultado para a pessoa.
 
-Cenários (estão em `eval/scenarios.yaml`):
+Cenários:
 
 | # | Usuário | Mensagem | O que observamos |
 |---|---|---|---|
@@ -60,16 +59,11 @@ Os cenários que usamos na avaliação são **variações** destes, com outras p
 cp .env.example .env              # coloque a chave da OpenRouter em OPENROUTER_API_KEY
 docker compose up --build         # proxy + agente
 # abra http://localhost:3000
-docker compose run --rm eval      # roda os cenários; relatório em eval/out/report.md
 ```
 
-- O eval espera o `/health` do proxy e do agente, **reseta o log e as conversas do proxy** (conversas abertas no
-  navegador param de funcionar; clique em "Nova conversa") e roda os cenários.
-- O relatório mostra cada check como ✅ / ❌ / ⏭ (não se aplica ou pulado). Os checks do tipo `judge` só rodam se
-  `JUDGE_API_KEY` estiver preenchida (pode ser a mesma chave).
 - Para depurar: `GET http://localhost:3000/admin/log?conversation_id=<id>` mostra os turnos e as chamadas de tools
   registradas pelo proxy.
-- Os testes do proxy e do eval rodam com `pip install -r requirements-dev.txt && pytest`.
+- Os testes do proxy rodam com `pip install -r requirements-dev.txt && pytest`.
 
 ## Contrato do agente
 
@@ -130,10 +124,10 @@ A chave que enviamos dá acesso a estes modelos na [OpenRouter](https://openrout
 
 - Altere apenas `agent/` e o `docker-compose.yml`: você pode mudar o serviço `agent` (volumes, variáveis,
   `depends_on`) e adicionar serviços (banco, cache, tracing…).
-- Não altere `proxy/`, `eval/`, `seed-images/`, os dados de teste ou `proxy/faults.json`: na avaliação usamos a
+- Não altere `proxy/`, `seed-images/`, os dados de teste ou `proxy/faults.json`: na avaliação usamos a
   nossa cópia deles.
-- O agente não pode chamar `/admin/*` nem `/conversations/*`. Esses endpoints existem só para depuração, para o eval e
-  para o histórico do frontend.
+- O agente não pode chamar `/admin/*` nem `/conversations/*`. Esses endpoints existem só para depuração, para a nossa
+  avaliação e para o histórico do frontend.
 - A única chamada externa permitida é para a OpenRouter, com a chave fornecida. Todo o resto roda dentro do compose.
 - Nunca faça commit da chave.
 
