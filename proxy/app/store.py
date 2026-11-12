@@ -37,10 +37,11 @@ class Store:
         self.db = sqlite3.connect(db_path, check_same_thread=False, isolation_level=None)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
-        try:  # databases created before the UI history existed
-            self.db.execute("ALTER TABLE turns ADD COLUMN events_json TEXT")
-        except sqlite3.OperationalError:
-            pass
+        for column in ("events_json", "images_json"):  # databases created before the UI history existed
+            try:
+                self.db.execute(f"ALTER TABLE turns ADD COLUMN {column} TEXT")
+            except sqlite3.OperationalError:
+                pass
         self._active: dict[str, int] = {}
 
     def claim_conversation(self, conversation_id: str, user_id: str) -> bool:
@@ -51,12 +52,12 @@ class Store:
         row = self.db.execute("SELECT user_id FROM conversations WHERE conversation_id = ?", (conversation_id,)).fetchone()
         return row["user_id"] if row else None
 
-    def begin_turn(self, conversation_id: str, user_id: str, message: str) -> int:
+    def begin_turn(self, conversation_id: str, user_id: str, message: str, images: list[str] | None = None) -> int:
         if conversation_id in self._active:
             raise TurnInProgress(conversation_id)
         cur = self.db.execute(
-            "INSERT INTO turns (conversation_id, user_id, message, started_at, t0) VALUES (?, ?, ?, ?, ?)",
-            (conversation_id, user_id, message, _now(), time.monotonic()))
+            "INSERT INTO turns (conversation_id, user_id, message, started_at, t0, images_json) VALUES (?, ?, ?, ?, ?, ?)",
+            (conversation_id, user_id, message, _now(), time.monotonic(), _dumps(images or [])))
         self._active[conversation_id] = cur.lastrowid
         return cur.lastrowid
 
@@ -133,16 +134,17 @@ class Store:
             " (SELECT message FROM turns t2 WHERE t2.conversation_id = t.conversation_id ORDER BY id LIMIT 1) AS first"
             " FROM turns t WHERE user_id = ? AND events_json IS NOT NULL AND events_json != '[]'"  # only replayable turns
             " GROUP BY conversation_id ORDER BY MAX(id) DESC", (user_id,)).fetchall()
-        title = lambda m: m if len(m) <= 60 else m[:60].rstrip() + "…"
+        title = lambda m: "📷 Imagem" if not m else m if len(m) <= 60 else m[:60].rstrip() + "…"
         return [{"conversation_id": r["conversation_id"], "title": title(r["first"] or ""), "turns": r["turns"],
                  "started_at": r["started_at"], "updated_at": r["updated_at"]} for r in rows]
 
     def messages(self, conversation_id: str) -> list[dict]:
         """Every finished turn of a conversation with the exact events the browser received, for replay."""
-        rows = self.db.execute("SELECT id, message, outcome, started_at, events_json FROM turns"
+        rows = self.db.execute("SELECT id, message, outcome, started_at, events_json, images_json FROM turns"
                                " WHERE conversation_id = ? AND outcome IS NOT NULL ORDER BY id", (conversation_id,))
         return [{"turn_id": r["id"], "message": r["message"], "outcome": r["outcome"], "started_at": r["started_at"],
-                 "events": json.loads(r["events_json"] or "[]")} for r in rows]
+                 "images": json.loads(r["images_json"] or "[]"), "events": json.loads(r["events_json"] or "[]")}
+                for r in rows]
 
     def reset(self) -> None:
         for table in ("conversations", "turns", "calls", "garments", "tryons"):

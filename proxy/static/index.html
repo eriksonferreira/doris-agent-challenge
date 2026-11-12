@@ -67,8 +67,10 @@
   @keyframes blink { 0%, 80%, 100% { opacity: .2; } 40% { opacity: 1; } }
   form { display: flex; gap: 8px; align-items: flex-end; padding: 12px 16px; border-top: 1px solid var(--line); }
   textarea { flex: 1; resize: none; min-height: 40px; max-height: 140px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
-  #attachment { font-size: 12px; color: var(--muted); padding: 0 16px; }
+  #attachment { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); padding: 8px 16px 0; }
   #attachment:empty { display: none; }
+  #attachment img { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+  #attachment button { padding: 2px 8px; font-size: 12px; }
   @media (max-width: 480px) { .card { width: calc(50% - 5px); } }
 </style>
 </head>
@@ -97,7 +99,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const brl = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-let conversationId = "", image = null, busy = false;
+let conversationId = "", image = null, busy = false, preparing = false;
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -151,7 +153,7 @@ async function openConversation(id) {
   setConversation(id);
   history.replaceState(null, "", "#" + id);
   for (const turn of page.turns) {  // replay exactly what the browser saw live
-    $("messages").append(el("div", "me", turn.message));
+    meBubble(turn.message, turn.images);
     const r = reply();
     for (const ev of turn.events) handle(ev, r);
     if (r.typing) r.typing.remove();
@@ -160,11 +162,35 @@ async function openConversation(id) {
   return true;
 }
 
-function clearImage() { image = null; $("file").value = ""; $("attachment").textContent = ""; }
+function clearImage() { image = null; $("file").value = ""; $("attachment").replaceChildren(); }
+
+// Phone photos are several MB: shrink to 1024px JPEG before sending (faster upload, fits model limits).
+function shrink(file, maxSide = 1024) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale); canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("imagem inválida")); };
+    img.src = url;
+  });
+}
+
+function meBubble(text, images) {
+  const me = el("div", "me", text);
+  for (const src of images || []) { const i = el("img"); i.src = src; i.alt = "imagem anexada"; me.append(i); }
+  $("messages").append(me);
+}
 
 function setBusy(v) {
   busy = v;
   for (const id of ["input", "send", "attach", "user-select", "new-chat"]) $(id).disabled = v;
+  if (!v) $("send").disabled = preparing;
   if (!v) $("input").focus();
 }
 
@@ -228,9 +254,7 @@ function handle(ev, r) {
 }
 
 async function send(message) {
-  const me = el("div", "me", message);
-  if (image) { const i = el("img"); i.src = image; i.alt = "imagem anexada"; me.append(i); }
-  $("messages").append(me);
+  meBubble(message, image ? [image] : []);
   const r = reply();
   const payload = { user_id: $("user-select").value, conversation_id: conversationId, message, images: image ? [image] : [] };
   clearImage(); setBusy(true); scroll();
@@ -272,7 +296,7 @@ async function send(message) {
 $("composer").addEventListener("submit", (e) => {
   e.preventDefault();
   const text = $("input").value.trim();
-  if (!text || busy) return;
+  if ((!text && !image) || busy || preparing) return;
   $("input").value = "";
   send(text);
 });
@@ -280,12 +304,21 @@ $("input").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("composer").requestSubmit(); }
 });
 $("attach").addEventListener("click", () => $("file").click());
-$("file").addEventListener("change", () => {
+$("file").addEventListener("change", async () => {
   const f = $("file").files[0];
   if (!f) return;
-  const reader = new FileReader();
-  reader.onload = () => { image = reader.result; $("attachment").textContent = "📎 " + f.name; };
-  reader.readAsDataURL(f);
+  preparing = true; $("send").disabled = true;
+  $("attachment").replaceChildren(el("span", "", "Preparando imagem…"));
+  try {
+    image = await shrink(f);
+    const thumb = el("img"); thumb.src = image; thumb.alt = "prévia da imagem";
+    const remove = el("button", "", "remover"); remove.type = "button"; remove.addEventListener("click", clearImage);
+    $("attachment").replaceChildren(thumb, el("span", "", f.name), remove);
+  } catch (e) {
+    image = null; $("attachment").replaceChildren(el("span", "error", "Não consegui ler essa imagem."));
+  } finally {
+    preparing = false; if (!busy) $("send").disabled = false;
+  }
 });
 $("new-chat").addEventListener("click", newConversation);
 $("user-select").addEventListener("change", () => { newConversation(); loadHistory(); });

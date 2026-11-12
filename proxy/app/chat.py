@@ -122,7 +122,7 @@ async def chat(body: ChatIn, request: Request):
     if not st.store.claim_conversation(body.conversation_id, body.user_id):
         return JSONResponse(error_body("conversation_owned", "esta conversa pertence a outro usuário"), status_code=409)
     try:
-        turn_id = st.store.begin_turn(body.conversation_id, body.user_id, body.message)
+        turn_id = st.store.begin_turn(body.conversation_id, body.user_id, body.message, body.images)
     except TurnInProgress:
         return JSONResponse(error_body("turn_in_progress", "já existe um turno em andamento nesta conversa", True),
                             status_code=409)

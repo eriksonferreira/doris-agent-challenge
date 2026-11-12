@@ -56,3 +56,14 @@ async def test_messages_of_unknown_conversation_404(tmp_path):
     async with client_for(app) as c:
         r = await c.get("/conversations/nope/messages")
     assert r.status_code == 404 and r.json()["error"]["code"] == "conversation_not_found"
+
+
+async def test_messages_keep_attached_images(tmp_path):
+    app = wire(tmp_path, lambda b, p: say({"type": "text", "delta": "Bonito!"}, {"type": "done"}))
+    img = "data:image/jpeg;base64,/9j/AAAA"
+    async with client_for(app) as c:
+        await c.post("/chat", json={"user_id": "u_carla", "conversation_id": "c-img", "message": "", "images": [img]})
+        page = (await c.get("/conversations/c-img/messages")).json()
+        convs = (await c.get("/conversations", params={"user_id": "u_carla"})).json()
+    assert page["turns"][0]["images"] == [img]
+    assert convs[0]["title"] == "📷 Imagem"
