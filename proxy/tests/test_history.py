@@ -35,7 +35,7 @@ async def test_conversations_listed_per_user_newest_first(tmp_path):
 async def test_messages_replay_what_the_browser_saw(tmp_path):
     async def behavior(b, proxy):
         yield {"type": "feedback", "id": "s", "text": "Buscando…", "state": "running"}
-        await proxy.post("/tools/show_artifact", json={"conversation_id": b["conversation_id"], "type": "PRODUCT",
+        await proxy.post("/tools/show_artifact", json={"conversation_id": b["metadata"]["conversation_id"], "type": "PRODUCT",
                                                         "value": "p01"})
         yield {"type": "feedback", "id": "s", "text": "Pronto", "state": "done"}
         yield {"type": "text", "delta": "Achei esta."}

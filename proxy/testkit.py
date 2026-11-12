@@ -17,14 +17,31 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import StreamingResponse
 
 
+def oai_lines(ev) -> list[str]:
+    """Translate a readable test event into what an OpenAI-compatible agent streams."""
+    if isinstance(ev, str):
+        return [ev]
+    sse = lambda obj: f"data: {json.dumps(obj, ensure_ascii=False)}\n\n"
+    chunk = lambda **kw: {"object": "chat.completion.chunk", **kw}
+    kind = ev.get("type")
+    if kind == "text":
+        return [sse(chunk(choices=[{"index": 0, "delta": {"content": ev["delta"]}, "finish_reason": None}]))]
+    if kind == "done":
+        return [sse(chunk(choices=[{"index": 0, "delta": {}, "finish_reason": "stop"}])), "data: [DONE]\n\n"]
+    if kind == "error":
+        return [sse({"error": {"message": ev.get("message", ""), "type": "agent_error"}})]
+    return [sse(chunk(choices=[], doris=ev))]  # feedback (and anything custom) rides in the `doris` field
+
+
 def make_fake_agent(behavior) -> FastAPI:
-    """A stand-in agent. `behavior(body, proxy)` returns a Response, or an async iterator of
-    event dicts (sent as SSE `data:` lines) and raw strings (sent verbatim)."""
+    """A stand-in OpenAI-compatible agent. `behavior(body, proxy)` returns a Response, or an async iterator of
+    readable events ({"type": "text"|"feedback"|"done"|"error", ...}, translated by `oai_lines`) and raw strings
+    (sent verbatim)."""
     agent = FastAPI()
     agent.state.proxy = None
     agent.state.received = []
 
-    @agent.post("/chat")
+    @agent.post("/v1/chat/completions")
     async def chat(request: Request):
         body = await request.json()
         agent.state.received.append(body)
@@ -36,7 +53,8 @@ def make_fake_agent(behavior) -> FastAPI:
 
         async def gen():
             async for ev in result:
-                yield ev if isinstance(ev, str) else f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
+                for line in oai_lines(ev):
+                    yield line
 
         return StreamingResponse(gen(), media_type="text/event-stream")
 
@@ -83,6 +101,7 @@ class StreamingASGITransport(httpx.AsyncBaseTransport):
                  "query_string": url.query, "root_path": "", "client": ("127.0.0.1", 50000),
                  "server": (url.host, url.port or 80), "headers": [(k.lower(), v) for k, v in request.headers.raw]}
         task = asyncio.create_task(self.app(scope, receive, send))
+        task.add_done_callback(lambda _: chunks.put_nowait(None))  # app crashed or ended: never leave a reader hanging
         waiter = asyncio.create_task(started.wait())
         await asyncio.wait({task, waiter}, return_when=asyncio.FIRST_COMPLETED)
         if not started.is_set():

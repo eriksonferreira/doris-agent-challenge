@@ -31,7 +31,7 @@ async def say(*events, sleep=0.0):
 async def test_happy_turn(tmp_path):
     async def behavior(b, proxy):
         yield {"type": "text", "delta": "Ol"}
-        await proxy.post("/tools/show_artifact", json={"conversation_id": b["conversation_id"], "type": "PRODUCT",
+        await proxy.post("/tools/show_artifact", json={"conversation_id": b["metadata"]["conversation_id"], "type": "PRODUCT",
                                                         "value": "p01"})
         yield {"type": "text", "delta": "á"}
         yield {"type": "done"}
@@ -56,15 +56,19 @@ async def test_forwards_body(tmp_path):
     b = body(images=["https://img/x.jpg"])
     async with client_for(app) as c:
         await c.post("/chat", json=b)
-    assert app.state.fake_agent.state.received == [{**b, "profile": {"name": "Ana", "gender": "FEMALE",
-                                                                      "city": "São Paulo"}}]
+    assert app.state.fake_agent.state.received == [{
+        "model": "doris-agent", "stream": True, "user": "u_ana",
+        "messages": [{"role": "user", "content": [{"type": "text", "text": "oi"},
+                                                  {"type": "image_url", "image_url": {"url": "https://img/x.jpg"}}]}],
+        "metadata": {"conversation_id": b["conversation_id"],
+                     "profile": {"name": "Ana", "gender": "FEMALE", "city": "São Paulo"}}}]
 
 
 async def test_profile_injected_for_suffixed_user(tmp_path):
     app = wire(tmp_path, lambda b, p: say({"type": "done"}))
     async with client_for(app) as c:
         await c.post("/chat", json=body(user="u_bruno__r1"))
-    assert app.state.fake_agent.state.received[0]["profile"] == {"name": "Bruno", "gender": "MALE",
+    assert app.state.fake_agent.state.received[0]["metadata"]["profile"] == {"name": "Bruno", "gender": "MALE",
                                                                   "city": "Rio de Janeiro"}
 
 
@@ -206,3 +210,25 @@ async def test_empty_ids_rejected(tmp_path):
         no_user = await c.post("/chat", json={**body(), "user_id": ""})
     assert no_conv.status_code == 400 and no_conv.json()["error"]["code"] == "invalid_request"
     assert no_user.status_code == 400
+
+
+async def test_finish_reason_without_done_marker_still_ends_turn(tmp_path):
+    finish = 'data: {"object": "chat.completion.chunk", "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]}\n\n'
+    app = wire(tmp_path, lambda b, p: say({"type": "text", "delta": "oi"}, finish))
+    async with client_for(app) as c:
+        evs = events_of(await c.post("/chat", json=body()))
+    assert evs == [{"type": "text", "delta": "oi"}, {"type": "done"}]
+
+
+async def test_done_marker_ends_turn(tmp_path):
+    app = wire(tmp_path, lambda b, p: say({"type": "text", "delta": "a"}, "data: [DONE]\n\n", {"type": "text", "delta": "late"}))
+    async with client_for(app) as c:
+        evs = events_of(await c.post("/chat", json=body()))
+    assert evs == [{"type": "text", "delta": "a"}, {"type": "done"}]
+
+
+async def test_text_only_message_has_single_text_part(tmp_path):
+    app = wire(tmp_path, lambda b, p: say({"type": "done"}))
+    async with client_for(app) as c:
+        await c.post("/chat", json=body(message="só texto"))
+    assert app.state.fake_agent.state.received[0]["messages"][0]["content"] == [{"type": "text", "text": "só texto"}]

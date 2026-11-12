@@ -32,42 +32,67 @@ def _error(code: str, message: str) -> dict:
     return {"type": "error", "code": code, "message": message}
 
 
-def _clean(ev) -> dict | None:
-    """Agent event → client event, or None to skip it."""
-    if not isinstance(ev, dict):
-        return None
-    kind = ev.get("type")
-    if kind == "text" and isinstance(ev.get("delta"), str):
-        return {"type": "text", "delta": ev["delta"]}
-    if kind == "feedback" and isinstance(ev.get("id"), str) and isinstance(ev.get("text"), str):
-        state = ev.get("state") if ev.get("state") in FEEDBACK_STATES else "running"
-        return {"type": "feedback", "id": ev["id"], "text": ev["text"], "state": state}
-    if kind == "done":
-        return {"type": "done"}
-    if kind == "error":
-        return _error("agent_error", str(ev.get("message") or "erro no agente"))
-    return None
+def _from_openai(obj) -> list[dict]:
+    """One OpenAI-compatible stream object → browser events. Text comes from choices[].delta.content, tool feedback
+    from the Doris extension field `doris`, errors from the standard `error` object. Anything else is skipped."""
+    if not isinstance(obj, dict):
+        return []
+    if isinstance(obj.get("error"), dict):
+        return [_error("agent_error", str(obj["error"].get("message") or "erro no agente"))]
+    out = []
+    ext = obj.get("doris")
+    if isinstance(ext, dict) and ext.get("type") == "feedback" and isinstance(ext.get("id"), str) \
+            and isinstance(ext.get("text"), str):
+        state = ext.get("state") if ext.get("state") in FEEDBACK_STATES else "running"
+        out.append({"type": "feedback", "id": ext["id"], "text": ext["text"], "state": state})
+    for choice in obj.get("choices") or []:
+        content = (choice.get("delta") or {}).get("content") if isinstance(choice, dict) else None
+        if isinstance(content, str) and content:
+            out.append({"type": "text", "delta": content})
+    return out
 
 
-async def _pump_agent(agent: httpx.AsyncClient, body: dict, out: asyncio.Queue) -> None:
+def _finished(obj) -> bool:
+    return isinstance(obj, dict) and any(isinstance(c, dict) and c.get("finish_reason")
+                                         for c in obj.get("choices") or [])
+
+
+def openai_request(body: "ChatIn", profile: dict) -> dict:
+    """What the agent receives: an OpenAI Chat Completions streaming request with only the current message."""
+    content = [{"type": "text", "text": body.message}]
+    content += [{"type": "image_url", "image_url": {"url": url}} for url in body.images]
+    return {"model": "doris-agent", "stream": True, "user": body.user_id,
+            "messages": [{"role": "user", "content": content}],
+            "metadata": {"conversation_id": body.conversation_id, "profile": profile}}
+
+
+async def _pump_agent(agent: httpx.AsyncClient, request: dict, out: asyncio.Queue) -> None:
+    finished = False
     try:
-        async with agent.stream("POST", "/chat", json=body) as r:
+        async with agent.stream("POST", "/v1/chat/completions", json=request) as r:
             if r.status_code != 200:
                 out.put_nowait(_error("agent_error", f"o agente respondeu HTTP {r.status_code}"))
                 return
             async for line in r.aiter_lines():
                 if not line.startswith("data:"):
                     continue
+                payload = line[5:].strip()
+                if payload == "[DONE]":
+                    out.put_nowait({"type": "done"})
+                    return
                 try:
-                    ev = _clean(json.loads(line[5:].strip()))
+                    obj = json.loads(payload)
                 except ValueError:
                     continue
-                if ev is None:
-                    continue
-                out.put_nowait(ev)
-                if ev["type"] in ("done", "error"):
-                    return
-        out.put_nowait(_error("agent_error", "o agente encerrou a resposta sem enviar done"))
+                for ev in _from_openai(obj):
+                    out.put_nowait(ev)
+                    if ev["type"] == "error":
+                        return
+                finished = finished or _finished(obj)
+        if finished:  # tolerate agents that end with finish_reason but omit the [DONE] marker
+            out.put_nowait({"type": "done"})
+        else:
+            out.put_nowait(_error("agent_error", "o agente encerrou a resposta sem finish_reason nem [DONE]"))
     except httpx.ConnectError as e:
         out.put_nowait(_error("agent_unavailable", f"não foi possível conectar ao agente: {e}"))
     except httpx.HTTPError as e:
@@ -79,8 +104,8 @@ async def _pump_agent(agent: httpx.AsyncClient, body: dict, out: asyncio.Queue) 
 async def _stream(st, body: ChatIn, turn_id: int, out: asyncio.Queue):
     cid = body.conversation_id
     u = st.seed.users[persona_of(body.user_id)]
-    forwarded = {**body.model_dump(), "profile": {"name": u["name"], "gender": u["gender"], "city": u["city"]}}
-    pump = asyncio.create_task(_pump_agent(st.agent, forwarded, out))
+    profile = {"name": u["name"], "gender": u["gender"], "city": u["city"]}
+    pump = asyncio.create_task(_pump_agent(st.agent, openai_request(body, profile), out))
     text: list[str] = []
     sent: list[dict] = []  # exactly what the browser receives, saved for the UI history
     n_artifacts, outcome = 0, "error"

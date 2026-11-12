@@ -70,33 +70,55 @@ docker compose up --build         # proxy + agente
 O proxy chama o seu agente em `AGENT_URL` (padrão `http://agent:8000`). O agente chama as tools em `PROXY_URL`
 (padrão `http://proxy:3000`).
 
-### `POST /chat`
+O contrato é **compatível com OpenAI Chat Completions em streaming**. Só três pontos são da Doris, e estão marcados
+abaixo como extensões.
+
+### `POST /v1/chat/completions`
 
 ```json
 {
-  "user_id": "u_ana",
-  "conversation_id": "5f0c…",
-  "message": "Tenho um casamento na praia sábado, o que eu visto?",
-  "images": [],
-  "profile": { "name": "Bruno", "gender": "MALE", "city": "Rio de Janeiro" }
+  "model": "doris-agent",
+  "stream": true,
+  "user": "u_bruno",
+  "messages": [
+    { "role": "user", "content": [
+      { "type": "text", "text": "Tenho um casamento na praia sábado, o que eu visto?" },
+      { "type": "image_url", "image_url": { "url": "data:image/jpeg;base64,…" } }
+    ] }
+  ],
+  "metadata": {
+    "conversation_id": "5f0c…",
+    "profile": { "name": "Bruno", "gender": "MALE", "city": "Rio de Janeiro" }
+  }
 }
 ```
 
-- `profile`: perfil básico da pessoa, injetado pelo proxy em toda chamada (nome, gênero, cidade). Não traz
-  gostos nem preferências.
-- `images`: imagens anexadas pela pessoa nesta mensagem (URL pública ou `data:image/...;base64,...`).
-- Cada chamada traz **só a mensagem atual**. O proxy não envia o histórico: guardar a conversa e decidir o que vai
-  para cada chamada de modelo é responsabilidade do agente.
-- Um `user_id` pode aparecer com sufixo (`u_ana__abc`). Trate cada `user_id` como uma pessoa diferente.
+- `user`: id da pessoa. Pode vir com sufixo (`u_ana__abc`); trate cada `user` como uma pessoa diferente.
+- `messages`: **extensão — só a mensagem atual.** Diferente do uso comum da API, o proxy não envia o histórico:
+  guardar a conversa e decidir o que vai para cada chamada de modelo é responsabilidade do agente. As partes
+  `image_url` são as imagens que a pessoa anexou (data URI).
+- `metadata`: **extensão.** `conversation_id` (use nas chamadas de tools) e `profile`, o perfil básico da pessoa
+  (nome, gênero, cidade), sem gostos nem preferências.
 
-A resposta é `text/event-stream`. Cada evento é uma linha `data: <json>` seguida de uma linha em branco:
+A resposta é `text/event-stream` no formato padrão da OpenAI:
 
-| Evento | Para que serve |
-|---|---|
-| `{"type": "text", "delta": "…"}` | Pedaço do texto da resposta (zero ou mais) |
-| `{"type": "feedback", "id": "tryon-1", "text": "Gerando seu try-on…", "state": "running"}` | Linha de progresso. O frontend mostra uma linha por `id`; um evento novo com o mesmo `id` atualiza a linha. `state`: `running` (spinner), `done` (✓) ou `error` (✗) |
-| `{"type": "done"}` | Fim do turno (exatamente um, por último) |
-| `{"type": "error", "message": "…"}` | Fim do turno com erro (no lugar do `done`) |
+```
+data: {"object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"Para a praia, "},"finish_reason":null}]}
+data: {"object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"linho é ótimo."},"finish_reason":null}]}
+data: {"object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+data: [DONE]
+```
+
+- **Extensão — feedback de tools:** um chunk com `choices: []` e o campo `doris`:
+
+  ```
+  data: {"object":"chat.completion.chunk","choices":[],"doris":{"type":"feedback","id":"tryon-1","text":"Gerando seu try-on…","state":"running"}}
+  ```
+
+  O frontend mostra uma linha por `id`; um novo chunk com o mesmo `id` atualiza a linha. `state`: `running`
+  (spinner), `done` (✓) ou `error` (✗). Clientes OpenAI comuns ignoram esse campo.
+- Erro: `data: {"error":{"message":"…","type":"agent_error"}}` encerra o turno com erro.
+- O turno termina no `data: [DONE]` (ou no chunk com `finish_reason`, se o `[DONE]` não vier).
 
 Para **mostrar** produtos, peças e try-ons para a pessoa, o agente chama `POST /tools/show_artifact`. O proxy
 coloca o card no chat. Um try-on que nunca é mostrado não aparece para a pessoa.
