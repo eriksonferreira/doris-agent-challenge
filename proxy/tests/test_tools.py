@@ -44,7 +44,7 @@ def test_garment_creation_deterministic(client):
     second = post(client, "garment_creation", cid, search_item_id="p01").json()["data"]
     assert first["garment_id"] == second["garment_id"]
     assert first["status"] == "PROCESSED" and first["type"] == "TOP" and first["category"] == "shirt"
-    assert first["ghost_image_url"].endswith("ghosts/p01.svg")
+    assert first["ghost_image_url"].endswith("products/p01.jpg")
 
 
 def test_garment_creation_unknown_item_422(client):
@@ -90,7 +90,7 @@ def test_tryon_unknown_garment_422(client):
 def test_suffix_users_share_persona_not_state(client):
     cx, cy = conv(client, "u_ana__x"), conv(client, "u_ana__y")
     wardrobe = post(client, "wardrobe", cx).json()["data"]["garments"]
-    assert [g["garment_id"] for g in wardrobe] == ["w_ana_1", "w_ana_2"]
+    assert [g["garment_id"] for g in wardrobe] == ["w_ana_1", "w_ana_2", "w_ana_3", "w_ana_4", "w_ana_5"]
     gid = make_garment(client, cx, "p01")
     assert post(client, "tryon", cy, garment_ids=[gid]).status_code == 422
 
@@ -98,7 +98,7 @@ def test_suffix_users_share_persona_not_state(client):
 def test_wardrobe_filter_by_type(client):
     cid = conv(client)
     garments = post(client, "wardrobe", cid, garment_types=["TOP"]).json()["data"]["garments"]
-    assert [g["garment_id"] for g in garments] == ["w_ana_2"]
+    assert [g["garment_id"] for g in garments] == ["w_ana_2", "w_ana_3", "w_ana_4"]
 
 
 def test_public_fault_tryon_p07(client):
@@ -155,7 +155,7 @@ def test_no_proxy_progress_events(client):
 def test_avatar_shape(client):
     avatars = post(client, "avatar", conv(client)).json()["data"]["avatars"]
     assert avatars[0]["lifecycle_status"] == "READY"
-    assert avatars[0]["poses"][0]["pose"] == "NORMAL" and avatars[0]["poses"][0]["image_url"].endswith("u_ana.svg")
+    assert avatars[0]["poses"][0]["pose"] == "NORMAL" and avatars[0]["poses"][0]["image_url"].endswith("u_ana.jpg")
 
 
 def test_profile_has_only_basic_keys(client):
@@ -169,7 +169,7 @@ def test_users_and_health(client):
 
 
 def test_seed_images_served(client):
-    assert client.get("/seed-images/products/p01.svg").status_code == 200
+    assert client.get("/seed-images/products/p01.jpg").status_code == 200
 
 
 def test_invalid_tool_body_is_logged(client):

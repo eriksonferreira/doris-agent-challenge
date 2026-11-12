@@ -25,9 +25,9 @@ def test_load_resolves_urls_and_overrides(tmp_path):
     s = load_seed(SEED_DIR, "https://img.test/base/", ov)
     assert s.catalog["p01"]["price"] == 1.0 and s.catalog["p01"]["description"] == "x"
     assert s.catalog["p01"]["image_url"].startswith("https://img.test/base/products/")
-    assert s.renders["u_ana"]["p01"] == "https://img.test/base/tryons/u_ana/p01.svg"
-    assert s.users["u_ana"]["avatar_url"] == "https://img.test/base/avatars/u_ana.svg"
-    assert s.wardrobe["u_ana"][0]["ghost_image_url"].startswith("https://img.test/base/ghosts/")
+    assert s.renders["u_ana"]["p01"] == "https://img.test/base/tryons/u_ana/p01.jpg"
+    assert s.users["u_ana"]["avatar_url"] == "https://img.test/base/avatars/u_ana.jpg"
+    assert s.wardrobe["u_ana"][0]["ghost_image_url"].startswith("https://img.test/base/garments/")
     assert s.looks["u_carla"][0]["tryon_image_url"].startswith("https://img.test/base/tryons/")
 
 
@@ -50,6 +50,6 @@ def test_validate_reports_missing_render(tmp_path):
 
 def test_validate_reports_missing_image_file(tmp_path):
     shutil.copytree(IMAGES_DIR, tmp_path / "img")
-    (tmp_path / "img/products/p03.svg").unlink()
+    (tmp_path / "img/products/p03.jpg").unlink()
     problems = validate_seed(SEED_DIR, tmp_path / "img")
-    assert any("products/p03.svg" in p for p in problems)
+    assert any("products/p03.jpg" in p for p in problems)
