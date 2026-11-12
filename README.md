@@ -8,8 +8,9 @@ looks, gera um **try-on** (a peça vestida no avatar da pessoa) e opina sobre o 
 Neste repositório você já recebe tudo **menos o agente**:
 
 - **Frontend** de chat (em `http://localhost:3000`).
-- **Proxy**: o serviço que fica entre o app e o agente. Ele repassa cada mensagem ao agente, devolve a resposta em
-  streaming para o frontend e expõe as **tools** (busca, criação de peça, try-on, guarda-roupa, looks, perfil…).
+- **Proxy**: o serviço que fica entre o app e o agente. Ele repassa cada mensagem ao agente (com o perfil básico da
+  pessoa), devolve a resposta em streaming para o frontend e expõe as **tools** (busca, criação de peça, try-on,
+  guarda-roupa, looks…).
 - **Dados de teste**: 3 usuários (Ana, Bruno e Carla), cada um com avatar, guarda-roupa e looks anteriores, e um
   catálogo de produtos fictícios.
 - **Eval**: um runner que executa os cenários abaixo contra o seu agente e gera um relatório.
@@ -82,10 +83,13 @@ O proxy chama o seu agente em `AGENT_URL` (padrão `http://agent:8000`). O agent
   "user_id": "u_ana",
   "conversation_id": "5f0c…",
   "message": "Tenho um casamento na praia sábado, o que eu visto?",
-  "images": []
+  "images": [],
+  "profile": { "name": "Bruno", "gender": "MALE", "city": "Rio de Janeiro" }
 }
 ```
 
+- `profile`: perfil básico da pessoa, injetado pelo proxy em toda chamada (nome, gênero, cidade). Não traz
+  gostos nem preferências.
 - `images`: imagens anexadas pela pessoa nesta mensagem (URL pública ou `data:image/...;base64,...`).
 - Cada chamada traz **só a mensagem atual**. O proxy não envia o histórico: guardar a conversa e decidir o que vai
   para cada chamada de modelo é responsabilidade do agente.

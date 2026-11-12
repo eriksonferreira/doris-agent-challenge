@@ -17,7 +17,7 @@ router = APIRouter(prefix="/tools")
 
 LATENCY = {
     "search_by_text": (0.5, 1.0), "garment_creation": (3.0, 5.0), "tryon": (8.0, 12.0),
-    "avatar": (0.0, 0.3), "looks": (0.0, 0.3), "wardrobe": (0.0, 0.3), "profile": (0.0, 0.3),
+    "avatar": (0.0, 0.3), "looks": (0.0, 0.3), "wardrobe": (0.0, 0.3),
     "show_artifact": (0.0, 0.1),
 }
 
@@ -195,11 +195,6 @@ def h_wardrobe(st, user, cid, req, empty):
     return ok({"garments": garments})
 
 
-def h_profile(st, user, cid, req, empty):
-    u = st.seed.users[persona_of(user)]
-    return ok({"profile": {"name": u["name"], "gender": u["gender"], "city": u["city"]}})
-
-
 def _artifact(st, user: str, kind: str, value: str) -> dict:
     if kind == "PRODUCT":
         p = st.seed.catalog.get(value)
@@ -265,11 +260,6 @@ async def looks(body: LooksIn, request: Request):
 @router.post("/wardrobe")
 async def wardrobe(body: WardrobeIn, request: Request):
     return await run_tool(request, "wardrobe", body, h_wardrobe)
-
-
-@router.post("/profile")
-async def profile(body: Base, request: Request):
-    return await run_tool(request, "profile", body, h_profile)
 
 
 @router.post("/show_artifact")

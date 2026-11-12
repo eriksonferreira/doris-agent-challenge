@@ -78,7 +78,9 @@ async def _pump_agent(agent: httpx.AsyncClient, body: dict, out: asyncio.Queue) 
 
 async def _stream(st, body: ChatIn, turn_id: int, out: asyncio.Queue):
     cid = body.conversation_id
-    pump = asyncio.create_task(_pump_agent(st.agent, body.model_dump(), out))
+    u = st.seed.users[persona_of(body.user_id)]
+    forwarded = {**body.model_dump(), "profile": {"name": u["name"], "gender": u["gender"], "city": u["city"]}}
+    pump = asyncio.create_task(_pump_agent(st.agent, forwarded, out))
     text: list[str] = []
     n_artifacts, outcome = 0, "error"
     try:

@@ -122,12 +122,6 @@ Peças que a pessoa já tem. Filtro opcional por tipo (`TOP`, `BOTTOM`, `DRESS`�
 ] } }
 ```
 
-## `POST /tools/profile`
-
-```json
-{ "ok": true, "data": { "profile": { "name": "Ana", "gender": "FEMALE", "city": "São Paulo" } } }
-```
-
 ## `POST /tools/show_artifact`
 
 Mostra um card no chat da pessoa, durante o turno em andamento.

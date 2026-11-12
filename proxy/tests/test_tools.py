@@ -158,9 +158,8 @@ def test_avatar_shape(client):
     assert avatars[0]["poses"][0]["pose"] == "NORMAL" and avatars[0]["poses"][0]["image_url"].endswith("u_ana.jpg")
 
 
-def test_profile_has_only_basic_keys(client):
-    profile = post(client, "profile", conv(client, "u_bruno")).json()["data"]["profile"]
-    assert profile == {"name": "Bruno", "gender": "MALE", "city": "Rio de Janeiro"}
+def test_profile_tool_removed(client):
+    assert post(client, "profile", conv(client, "u_bruno")).status_code == 404
 
 
 def test_users_and_health(client):

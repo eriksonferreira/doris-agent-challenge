@@ -56,7 +56,16 @@ async def test_forwards_body(tmp_path):
     b = body(images=["https://img/x.jpg"])
     async with client_for(app) as c:
         await c.post("/chat", json=b)
-    assert app.state.fake_agent.state.received == [b]
+    assert app.state.fake_agent.state.received == [{**b, "profile": {"name": "Ana", "gender": "FEMALE",
+                                                                      "city": "São Paulo"}}]
+
+
+async def test_profile_injected_for_suffixed_user(tmp_path):
+    app = wire(tmp_path, lambda b, p: say({"type": "done"}))
+    async with client_for(app) as c:
+        await c.post("/chat", json=body(user="u_bruno__r1"))
+    assert app.state.fake_agent.state.received[0]["profile"] == {"name": "Bruno", "gender": "MALE",
+                                                                  "city": "Rio de Janeiro"}
 
 
 async def test_feedback_passthrough(tmp_path):
@@ -164,19 +173,19 @@ async def test_malformed_line_skipped(tmp_path):
 
 async def test_call_logged_under_turn_where_it_started(tmp_path):
     faults = tmp_path / "f.json"
-    faults.write_text(json.dumps({"rules": [{"tool": "profile", "match": {}, "effect": {"delay_ms": 300}}]}))
+    faults.write_text(json.dumps({"rules": [{"tool": "avatar", "match": {}, "effect": {"delay_ms": 300}}]}))
     app = wire(tmp_path, lambda b, p: say({"type": "done"}), faults_file=faults)
     cid = str(uuid.uuid4())
     store = app.state.store
     store.claim_conversation(cid, "u_ana")
     turn = store.begin_turn(cid, "u_ana", "oi")
     async with client_for(app) as c:
-        slow = asyncio.create_task(c.post("/tools/profile", json={"conversation_id": cid}))
+        slow = asyncio.create_task(c.post("/tools/avatar", json={"conversation_id": cid}))
         await asyncio.sleep(0.05)
         store.end_turn(turn, "turn_timeout", "", 0)
         await slow
         log = (await c.get("/admin/log", params={"conversation_id": cid})).json()
-    assert [c["tool"] for c in log["turns"][0]["calls"]] == ["profile"]
+    assert [c["tool"] for c in log["turns"][0]["calls"]] == ["avatar"]
     assert log["calls_outside_turns"] == []
 
 

@@ -43,6 +43,12 @@
   .card a { color: var(--accent); }
   .card.tryon { width: min(320px, 100%); }
   .error { color: var(--err); font-size: 13px; }
+  .typing { display: flex; gap: 4px; padding: 6px 0; }
+  .typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); opacity: .4;
+                 animation: blink 1.2s infinite ease-in-out; }
+  .typing span:nth-child(2) { animation-delay: .2s; }
+  .typing span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: .2; } 40% { opacity: 1; } }
   form { display: flex; gap: 8px; align-items: flex-end; padding: 12px 16px; border-top: 1px solid var(--line); }
   textarea { flex: 1; resize: none; min-height: 40px; max-height: 140px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
   #attachment { font-size: 12px; color: var(--muted); padding: 0 16px; }
@@ -67,6 +73,7 @@
     <button id="send" class="primary" type="submit">Enviar</button>
   </form>
 </div>
+<template id="typing-tpl"><div class="typing" aria-label="Doris está pensando"><span></span><span></span><span></span></div></template>
 <script>
 const $ = (id) => document.getElementById(id);
 const brl = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -130,12 +137,14 @@ function card(a) {
 function reply() {
   const r = el("div", "reply");
   const parts = { feedback: el("div", "feedback"), text: el("div", "text"), cards: el("div", "cards"), lines: {}, raw: "" };
-  r.append(parts.feedback, parts.text, parts.cards);
+  parts.typing = $("typing-tpl").content.firstElementChild.cloneNode(true);
+  r.append(parts.typing, parts.feedback, parts.text, parts.cards);
   $("messages").append(r);
   return { root: r, ...parts };
 }
 
 function handle(ev, r) {
+  if (r.typing) { r.typing.remove(); r.typing = null; }  // first sign of life from the agent
   if (ev.type === "text") { r.raw += ev.delta; linkify(r.text, r.raw); }
   else if (ev.type === "feedback") {
     let line = r.lines[ev.id];

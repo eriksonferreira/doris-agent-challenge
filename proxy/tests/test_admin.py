@@ -3,9 +3,9 @@ from conftest import conv
 
 def test_log_lists_calls(client):
     cid = conv(client)
-    client.post("/tools/profile", json={"conversation_id": cid})
+    client.post("/tools/avatar", json={"conversation_id": cid})
     log = client.get("/admin/log", params={"conversation_id": cid}).json()
-    assert [c["tool"] for c in log["calls_outside_turns"]] == ["profile"]
+    assert [c["tool"] for c in log["calls_outside_turns"]] == ["avatar"]
     assert client.get("/admin/log").json()["calls_outside_turns"]
 
 
