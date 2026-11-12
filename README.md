@@ -151,7 +151,7 @@ A chave que enviamos dá acesso a estes modelos na [OpenRouter](https://openrout
 
 ## Chave da OpenRouter
 
-Sua chave está aqui: **<LINK_ONETIMESECRET>**
+Sua chave está aqui: **<https://1time.io/v/#s9F-BOQRiDqi4nwsWFfP3a5HR81Vk-TghYldV15NBA>**
 
 O link funciona **uma única vez**. Se ele disser que já foi visualizado, nos avise antes de continuar. A chave tem
 um limite de gasto e é revogada depois do prazo.
