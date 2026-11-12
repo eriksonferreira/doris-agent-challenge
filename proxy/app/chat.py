@@ -7,7 +7,7 @@ import json
 import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.seed import persona_of
 from app.store import TurnInProgress
@@ -18,8 +18,8 @@ FEEDBACK_STATES = {"running", "done", "error"}
 
 
 class ChatIn(BaseModel):
-    user_id: str
-    conversation_id: str
+    user_id: str = Field(min_length=1)
+    conversation_id: str = Field(min_length=1)
     message: str
     images: list[str] = []
 

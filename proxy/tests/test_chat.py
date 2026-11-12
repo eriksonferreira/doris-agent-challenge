@@ -197,3 +197,12 @@ async def test_unexpected_agent_failure_is_agent_error(tmp_path):
     async with client_for(app) as c:
         evs = events_of(await c.post("/chat", json=body()))
     assert evs[-1]["type"] == "error" and evs[-1]["code"] == "agent_error"
+
+
+async def test_empty_ids_rejected(tmp_path):
+    app = wire(tmp_path, lambda b, p: say({"type": "done"}))
+    async with client_for(app) as c:
+        no_conv = await c.post("/chat", json={**body(), "conversation_id": ""})
+        no_user = await c.post("/chat", json={**body(), "user_id": ""})
+    assert no_conv.status_code == 400 and no_conv.json()["error"]["code"] == "invalid_request"
+    assert no_user.status_code == 400

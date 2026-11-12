@@ -106,6 +106,15 @@ function el(tag, cls, text) {
   return n;
 }
 
+// crypto.randomUUID only exists on https/localhost; getRandomValues works on plain http too (e.g. a LAN/VPN IP)
+function newId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
 function setConversation(id) {
   conversationId = id;
   $("messages").replaceChildren();
@@ -115,7 +124,7 @@ function setConversation(id) {
 }
 
 function newConversation() {
-  setConversation(crypto.randomUUID());
+  setConversation(newId());
   history.replaceState(null, "", location.pathname);
 }
 
